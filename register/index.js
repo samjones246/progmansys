@@ -1,4 +1,4 @@
-module.exports = async function (context, req, users, universities, outputDocument) {
+module.exports = async function (context, req, users, universities) {
     context.log('Register event fired');
 
     if (req.query.firstName && 
@@ -42,7 +42,8 @@ module.exports = async function (context, req, users, universities, outputDocume
                 body: "Email domain does not match a registered university"
             }
         }else{
-            outputDocument = {
+            console.log(university)
+            context.bindings.outputDocument = {
                 firstName: firstName,
                 lastName: lastName,
                 email: email,
@@ -50,6 +51,7 @@ module.exports = async function (context, req, users, universities, outputDocume
                 university: university,
                 about: "Nothing here yet"
             }
+            console.log(context.bindings.outputDocument)
             context.res = {
                 // status: 200, /* Defaults to 200 */
                 body: "User account " + email + " created successfully"

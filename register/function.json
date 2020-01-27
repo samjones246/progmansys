@@ -28,8 +28,8 @@
       "direction": "out",
       "name": "outputDocument",
       "databaseName": "Data",
-      "collectionName": "Users",
-      "createIfNotExists": "true",
+      "collectionName": "User",
+      "createIfNotExists": "false",
       "connectionStringSetting": "progmandb_DOCUMENTDB"
     },
     {
