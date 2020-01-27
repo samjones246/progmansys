@@ -18,7 +18,7 @@
     {
       "type": "cosmosDB",
       "direction": "in",
-      "name": "inputDocument",
+      "name": "users",
       "databaseName": "Data",
       "collectionName": "User",
       "connectionStringSetting": "progmandb_DOCUMENTDB"
