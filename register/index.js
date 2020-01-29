@@ -27,7 +27,7 @@ module.exports = async function (context, req, users, universities) {
         }
         for(i=0;i<universities.length;i++){
             if(universities[i].domain == domain){
-                university = i;
+                university = universities[i].id;
                 break;
             }
         }
