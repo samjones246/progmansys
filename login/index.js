@@ -1,18 +1,11 @@
-module.exports = async function (context, req, users) {
+module.exports = async function (context, req, user) {
     context.log('JavaScript HTTP trigger function processed a request.');
 
     if (req.query.email  && req.query.password || (req.body && req.body.email && req.body.password)) {
-        var userData = null;
-        for(var i=0;i<users.length;i++){
-            if(users[i].email==req.query.email||req.body.email && users[i].password==req.query.password||req.body.password){
-                userData = users[i];
-                break;
-            }
-        }
-        if(userData!=null){
+        if(user.length > 0){
             context.res = {
                 // status: 200, /* Defaults to 200 */
-                body: userData
+                body: user[0]
             };
         }else{
             context.res = {
