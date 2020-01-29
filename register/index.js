@@ -54,7 +54,14 @@ module.exports = async function (context, req, users, universities) {
             console.log(context.bindings.outputDocument)
             context.res = {
                 // status: 200, /* Defaults to 200 */
-                body: "User account " + email + " created successfully"
+                body: JSON.stringify({
+                    id: context.bindings.outputDocument.id,
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email,
+                    university: university,
+                    about: context.bindings.outputDocument.about
+                })
             };
         }
     }
