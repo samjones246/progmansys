@@ -15,33 +15,25 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
     const name = req.body.name;
     const duration = req.body.duration;
     const idToken = req.body.idToken;
-    /*
     admin.auth().verifyIdToken(idToken).then(function(decodedToken) {
         let uid = decodedToken.uid;
-        const programme = {
+        firestore.collection('programmes').add({
             name: name,
-            leader: firestore.doc("users/"+uid),
+            leader: uid,
             duration: duration,
             modules: [],
             outcomes: [],
-            core: []
-        }
+            core: [],
+            administrators: [
+                uid
+            ],
+            mapping: []
+        }).then(documentRef => {
+            documentRef.get().then(doc => {
+                res.send(doc.data());
+            })
+        });
     }).catch(function(error) {
         // Handle error
-    });
-    */
-    firestore.collection('programmes').add({
-        name: name,
-        leader: firestore.doc("users/"+idToken),
-        duration: duration,
-        modules: [],
-        outcomes: [],
-        core: [],
-        administrators: [
-            firestore.doc("users/"+idToken)
-        ],
-        mapping: []
-    }).then(doc => {
-        res.send(doc);
     });
 });
