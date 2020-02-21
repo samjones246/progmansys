@@ -1,8 +1,0 @@
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "",
-    "FUNCTIONS_WORKER_RUNTIME": "node",
-    "progmandb_DOCUMENTDB": "AccountEndpoint=https://progmandb.documents.azure.com:443/;AccountKey=wnppcCH9v9FIa9vND6yPya6FjnAUyOTejTxhxJWZJVMqFkVoanaei7ALCuywHhzeaYOK1d8DbZi0RTqgVfo0cQ==;"
-  }
-}
