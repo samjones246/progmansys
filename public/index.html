@@ -34,9 +34,10 @@
     <form id="programme-form">
       <input id="name">
       <input id="duration">
-      <input type="submit">
+      <button onclick="submit()">
     </form>
     <script>
+      const apiRoot = "http://localhost:5001/progmansys-6f164/us-central1"
       document.addEventListener('DOMContentLoaded', function() {
         // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
         // // The Firebase SDK is initialized and available here!
@@ -57,6 +58,20 @@
           document.getElementById('load').innerHTML = 'Error loading the Firebase SDK, check the console.';
         }
       });
+      function submit(){
+        var name = document.getElementById("name").value;
+        var duration = document.getElementById("duration").value;
+        var idToken = firebase.auth().currentUser.getIdToken();
+        axios.post(apiRoot+"/createProgramme",{
+          name: name,
+          duration: duration,
+          idToken: idToken
+        }).then(function (response){
+          console.log(response);
+        }).catch(function (error){
+          console.log(error)
+        });
+      }
     </script>
   </body>
 </html>

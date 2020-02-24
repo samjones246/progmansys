@@ -34,6 +34,6 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
             })
         });
     }).catch(function(error) {
-        // Handle error
+        res.status(403).send("Authentication Failed");
     });
 });
