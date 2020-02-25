@@ -90,3 +90,20 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
         return;
     });
 });
+
+exports.assignModule = functions.https.onRequest(async (req,res) => {
+    // Setup variables from request
+    const programmeId = req.body.programmeId;
+    const moduleId = req.body.moduleId;
+    const idToken = req.body.idToken;
+    // Check module exists
+    firestore.collection('modules').doc(moduleId).get().then(snapshot => {
+        if(snapshot.empty){
+            res.send("Module not found");
+            return;
+        }
+    });
+    // Check programme exists
+    // Check authority of user
+    // Check module not already assigned to programme
+});
