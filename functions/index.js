@@ -196,3 +196,91 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
         return;
     });
 });
+
+exports.deleteModule = functions.https.onRequest((req, res) => {
+    
+});
+
+exports.deleteProgramme = functions.https.onRequest((req, res) => {
+
+});
+
+exports.unassignModule = functions.https.onRequest((req, res) => {
+
+});
+
+exports.addAdministrator = functions.https.onRequest((req, res) => {
+
+});
+
+exports.removeAdministrator = functions.https.onRequest((req, res) => {
+
+});
+
+exports.transferProgrammeOwnership = functions.https.onRequest((req, res) => {
+
+});
+
+exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
+
+});
+
+exports.assignProgrammeOutcome = functions.https.onRequest((req, res) => {
+
+});
+
+exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
+
+});
+
+exports.unassignProgrammeOutcome = functions.https.onRequest((req, res) => {
+
+});
+
+exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
+
+});
+
+exports.mapOutcome = functions.https.onRequest((req, res) => {
+
+});
+
+exports.unmapOutcome = functions.https.onRequest((req, res) => {
+
+});
+
+exports.assignPrerequisite = functions.https.onRequest((req, res) => {
+
+});
+
+exports.unassignPrerequisite = functions.https.onRequest((req, res) => {
+
+});
+
+exports.changeSemester = functions.https.onRequest((req, res) => {
+
+});
+
+exports.changeYear = functions.https.onRequest((req, res) => {
+
+});
+
+exports.changeDuration = functions.https.onRequest((req, res) => {
+
+});
+
+exports.publishProgramme = functions.https.onRequest((req, res) => {
+
+});
+
+exports.unpublishProgramme = functions.https.onRequest((req, res) => {
+
+});
+
+exports.setCore = functions.https.onRequest((req, res) => {
+
+});
+
+exports.setOptional = functions.https.onRequest((req, res) => {
+
+});
