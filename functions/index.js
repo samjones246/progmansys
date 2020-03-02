@@ -10,7 +10,12 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://progmansys-6f164.firebaseio.com"
 });
+
+// Firestore reference
 const firestore = admin.firestore();
+
+// Enable CORS
+const cors = require('cors')({origin: true});
 
 exports.createProgramme = functions.https.onRequest(async (req, res) => {
     // Setup variables
@@ -65,59 +70,73 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
 });
 
 exports.createModule = functions.https.onRequest(async (req,res) => {
-    // Setup variables
-    const name = req.body.name;
-    const semester = req.body.semester;
-    const year = req.body.year;
-    const credits = req.body.credits;
-    const idToken = req.body.idToken;
-    var uid;
-    // Check semester is valid
-    if(semester.isNaN || semester < 1 || semester > 2){
-        res.status(400).send("Semester must be a number between 1 and 2");
-        return;
-    }
-    // Check year is valid
-    if(year.isNaN || year < 1 || year > 4){
-        res.status(400).send("Year must be a number between 1 and 4");
-        return;
-    }
-    // Check authority of user (logged in)
-    admin.auth().verifyIdToken(idToken).then(decodedToken => {
-        uid = decodedToken.uid;
-        return;
-    })
-    .then(() => {
-        return firestore.collection('modules').where('name', '==', name).get();
-    })
-    .then(snapshot => {
-        if(snapshot.empty){
-            return Promise.resolve();
-        }else{
-            return Promise.reject(Error("A module with this name already exists"))
-        }
-    })
-    .then(() => {
-        return firestore.collection('modules').add({
-            name: name,
-            leader: uid,
-            semester: semester,
-            year: year,
-            credits: credits,
-            outcomes: [],
-            prerequisites: []
+    cors(req, res, () => {
+        // Setup variables
+        const name = req.body.name;
+        const semester = req.body.semester;
+        const year = req.body.year;
+        const credits = req.body.credits;
+        const idToken = req.body.idToken;
+        var uid;
+        // Check semester is valid
+        new Promise((resolve, reject) => {
+            if(semester < 1 || semester > 2){
+                reject(Error("Semester must be a number between 1 and 2"));
+            }else{
+                resolve();
+            }
+        })
+        // Check year is valid
+        .then(() => {
+            if(year < 1 || year > 2){
+                return Promise.reject(Error("Year must be a number between 1 and 4"));
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // Check user is logged in
+        .then(() => {
+            return admin.auth().verifyIdToken(idToken);
+        })
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // Check module name is not taken
+        .then(() => {
+            return firestore.collection('modules').where('name', '==', name).get();
+        })
+        .then(snapshot => {
+            if(snapshot.empty){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("A module with this name already exists"))
+            }
+        })
+        // Create module
+        .then(() => {
+            return firestore.collection('modules').add({
+                name: name,
+                leader: uid,
+                semester: semester,
+                year: year,
+                credits: credits,
+                outcomes: [],
+                prerequisites: []
+            });
+        })
+        .then(documentRef => {
+            return documentRef.get();
+        })
+        .then(doc => {
+            res.send(doc.data());
+            return;
+        })
+        .catch(error => {
+            res.status(400).send(error.message);
+            console.log(error.message);
+            return;
         });
-    })
-    .then(documentRef => {
-        return documentRef.get();
-    })
-    .then(doc => {
-        res.send(doc.data());
-        return;
-    })
-    .catch(error => {
-        res.status(400).send(error.message);
-        return;
     });
 });
 
@@ -132,10 +151,10 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
     // Check module exists
     firestore.collection('modules').doc(moduleId).get()
     .then(snapshot => {
-        if(snapshot.empty){
+        if(!snapshot.exists){
             return Promise.reject(Error("Module not found"));
         }else{
-            moduleDoc = snapshot.docs[0].data();
+            moduleDoc = snapshot.data();
             return Promise.resolve();
         }
     })
@@ -144,10 +163,10 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
         return firestore.collection('programmes').doc(programmeId).get();
     })
     .then(snapshot => {
-        if(snapshot.empty){
+        if(!snapshot.exists){
             return Promise.reject(Error("Programme not found"));
         }else{
-            programmeDoc = snapshot.docs[0].data();
+            programmeDoc = snapshot.data();
             return Promise.resolve();
         }
     })
@@ -198,89 +217,144 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
 });
 
 exports.deleteModule = functions.https.onRequest((req, res) => {
-    
+    // Setup variables
+    const moduleId = req.body.moduleId;
+    const idToken = req.body.idToken;
+    var uid;
+    var moduleRef;
+    var moduleDoc;
+    // Check module exists
+    firestore.collection('modules').doc(moduleId).get()
+    .then(snapshot => {
+        if(!snapshot.exists){
+            return Promise.reject(Error("Module not found"));
+        }else{
+            moduleRef = snapshot.ref;
+            moduleDoc = snapshot.data();
+            return Promise.resolve();
+        }
+    })
+    // Check user is logged in
+    .then(() => {
+        return admin.auth().verifyIdToken(idToken);
+    })
+    // Check user is module leader
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        if(!moduleDoc.leader == uid){
+            return Promise.reject(Error("User not permitted to perform this action"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // Check module is not part of any programmes
+    .then(() => {
+        return firestore.collection("programmes").where("modules", "array-contains", moduleId).get();
+    })
+    .then(snapshot => {
+        if(snapshot.empty){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Cannot delete module while it is a member of a programme"));
+        }
+    })
+    // Delete module
+    .then(() => {
+        return moduleRef.delete();
+    })
+    .then(() => {
+        res.send("Module deleted");
+        return;
+    })
+    .catch(error => {
+        res.status("400").send(error.message);
+    });
 });
 
 exports.deleteProgramme = functions.https.onRequest((req, res) => {
-
+    // Setup variables
+    // Check programme exists
+    // Check user is logged in
+    // Check user is programme leader
+    // Check programme is not published
 });
 
 exports.unassignModule = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.addAdministrator = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.removeAdministrator = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.transferProgrammeOwnership = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.assignProgrammeOutcome = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.unassignProgrammeOutcome = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.mapOutcome = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.unmapOutcome = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.assignPrerequisite = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.unassignPrerequisite = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.changeSemester = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.changeYear = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.changeDuration = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.publishProgramme = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.unpublishProgramme = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.setCore = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });
 
 exports.setOptional = functions.https.onRequest((req, res) => {
-
+    res.send("Not yet implemented");
 });

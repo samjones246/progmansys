@@ -13,29 +13,39 @@ initApp = function() {
     firebase.auth().onAuthStateChanged(user => {
       if(user){
         $("#createProgramme").on("click", () => {
-            var res = axios.post(apiRoot+"/createProgramme", {
-                name: $("#programmeName").value,
-                duration: $("#programmeDuration").value,
-                idToken: user.idToken
+            user.getIdToken().then(idToken => {
+                axios.post(apiRoot+"/createProgramme", {
+                    name: $("#programmeName").value,
+                    duration: $("#programmeDuration").value,
+                    idToken: idToken
+                }).then(response => {
+                    console.log(response.data)
+                });
             });
-            console.log(res);
         });
         $("#createModule").on("click", () => {
-            var res = axios.post(apiRoot+"/createModule", {
-                name: $("#moduleName").value,
-                year: $("#moduleYear").value,
-                semester: $("#moduleSemester").value,
-                idToken: user.idToken
+            user.getIdToken().then(idToken => {
+                axios.post(apiRoot+"/createModule", {
+                    name: $("#moduleName").val(),
+                    year: $("#moduleYear").val(),
+                    semester: $("#moduleSemester").val(),
+                    credits: $("#moduleCredits").val(),
+                    idToken: idToken
+                }).then(response => {
+                    console.log(response.data);
+                });
             });
-            console.log(res);
         });
         $("#assignModule").on("click", () => {
-            var res = axios.post(apiRoot+"/assignModule", {
-                programmeId: $("#programmeId").value,
-                moduleId: $("#moduleId").value,
-                idToken: user.idToken
-            });
-            console.log(res);
+            user.getIdToken().then(idToken => {
+                axios.post(apiRoot+"/assignModule", {
+                    programmeId: $("#programmeId").val(),
+                    moduleId: $("#moduleId").val(),
+                    idToken: user.idToken
+                }).then(response => {
+                    console.log(response.data)
+                });
+            })
         });
         user.getIdToken().then(idToken => {
             $("#token").text(idToken);
