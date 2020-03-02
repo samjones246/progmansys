@@ -56,7 +56,8 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
             modules: [],
             core: [],
             outcomes: [],
-            mapping: []
+            mapping: [],
+            published: false
         });
     }).then(documentRef => {
         return documentRef.get();
@@ -190,6 +191,14 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
             return Promise.resolve();
         }
     })
+    // Check programme is not published
+    .then(() => {
+        if(programmeDoc.published){
+            return Promise.reject(Error("Cannot edit a published programme"));
+        }else{
+            return Promise.resolve();
+        }
+    })
     // Check module year is within programme duration
     .then(() => {
         if(moduleDoc.year > programmeDoc.duration){
@@ -273,10 +282,54 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
 
 exports.deleteProgramme = functions.https.onRequest((req, res) => {
     // Setup variables
+    const programmeId = req.body.programmeId;
+    const idToken = req.body.idToken;
+    var uid;
+    var programmeRef;
+    var programmeDoc;
     // Check programme exists
+    firestore.collection('programmes').doc(programmeId).get()
+    .then(snapshot => {
+        if(!snapshot.exists){
+            return Promise.reject(Error("programme not found"));
+        }else{
+            programmeRef = snapshot.ref;
+            programmeDoc = snapshot.data();
+            return Promise.resolve();
+        }
+    })
     // Check user is logged in
+    .then(() => {
+        return admin.auth().verifyIdToken(idToken);
+    })
     // Check user is programme leader
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        if(!programmeDoc.leader == uid){
+            return Promise.reject(Error("User not permitted to perform this action"));
+        }else{
+            return Promise.resolve();
+        }
+    })
     // Check programme is not published
+    .then(() => {
+        if(programmeDoc.published){
+            return Promise.reject(Error("Cannot delete a published programme"));
+        }else{
+            return Promise.resolve();
+        };
+    })
+    // Delete programme
+    .then(() => {
+        return programmeRef.delete();
+    })
+    .then(() => {
+        res.send("Programme deleted");
+        return;
+    })
+    .catch(error => {
+        res.status("400").send(error.message);
+    });
 });
 
 exports.unassignModule = functions.https.onRequest((req, res) => {
