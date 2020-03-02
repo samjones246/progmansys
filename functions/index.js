@@ -59,7 +59,7 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
         res.send(snapshot.data());
         return 0;
     }).catch(error => {
-        res.status(400).send(error)
+        res.status(400).send(error.message)
         return 0;
     });
 });
@@ -69,6 +69,7 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
     const name = req.body.name;
     const semester = req.body.semester;
     const year = req.body.year;
+    const credits = req.body.credits;
     const idToken = req.body.idToken;
     var uid;
     // Check semester is valid
@@ -102,7 +103,9 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
             leader: uid,
             semester: semester,
             year: year,
+            credits: credits,
             outcomes: [],
+            prerequisites: []
         });
     })
     .then(documentRef => {
@@ -113,7 +116,7 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
         return;
     })
     .catch(error => {
-        res.status(400).send(error);
+        res.status(400).send(error.message);
         return;
     });
 });
@@ -127,7 +130,8 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
     var programmeDoc;
     var moduleDoc;
     // Check module exists
-    firestore.collection('modules').doc(moduleId).get().then(snapshot => {
+    firestore.collection('modules').doc(moduleId).get()
+    .then(snapshot => {
         if(snapshot.empty){
             return Promise.reject(Error("Module not found"));
         }else{
@@ -135,6 +139,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
             return Promise.resolve();
         }
     })
+    // Check programme exists
     .then(() => {
         return firestore.collection('programmes').doc(programmeId).get();
     })
@@ -146,6 +151,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
             return Promise.resolve();
         }
     })
+    // Check user is authorised
     .then(() => {
         return admin.auth().verifyIdToken(idToken);
     })
@@ -157,6 +163,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
             return Promise.resolve();
         }
     })
+    // Check this module is not already assigned to this programme
     .then(() => {
         if(programmeDoc.modules.includes(moduleId)){
             return Promise.reject(Error("Module already assigned to this programme"));
@@ -164,22 +171,28 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
             return Promise.resolve();
         }
     })
+    // Check module year is within programme duration
     .then(() => {
         if(moduleDoc.year > programmeDoc.duration){
             return Promise.reject(Error("Module year not within programme duration"));
         }else{
             return Promise.resolve();
         }
-    }).then(() => {
+    })
+    // Assign module
+    .then(() => {
         programmeDoc.modules.push(moduleId);
         return firestore.collection('programmes').doc(programmeId).update({
             modules: programmeDoc.modules
         });
-    }).then(result => {
+    })
+    .then(result => {
         res.status(200).send("Module assigned successfully")
         return;
-    }).catch(error => {
-        res.status(400).send(error);
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
         return;
     });
 });

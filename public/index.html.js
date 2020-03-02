@@ -21,10 +21,24 @@ initApp = function() {
             console.log(res);
         });
         $("#createModule").on("click", () => {
-
+            var res = axios.post(apiRoot+"/createModule", {
+                name: $("#moduleName").value,
+                year: $("#moduleYear").value,
+                semester: $("#moduleSemester").value,
+                idToken: user.idToken
+            });
+            console.log(res);
         });
         $("#assignModule").on("click", () => {
-
+            var res = axios.post(apiRoot+"/assignModule", {
+                programmeId: $("#programmeId").value,
+                moduleId: $("#moduleId").value,
+                idToken: user.idToken
+            });
+            console.log(res);
+        });
+        user.getIdToken().then(idToken => {
+            $("#token").text(idToken);
         });
         $("#controls").show();
       }else{
