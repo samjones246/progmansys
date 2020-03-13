@@ -333,7 +333,78 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
 });
 
 exports.unassignModule = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const programmeId = req.body.programmeId;
+    const moduleId = req.body.moduleId;
+    const idToken = req.body.idToken;
+    var uid;
+    var programmeDoc;
+    var moduleDoc;
+    // Check module exists
+    firestore.collection('modules').doc(moduleId).get()
+    .then(snapshot => {
+        if(!snapshot.exists){
+            return Promise.reject(Error("Module not found"));
+        }else{
+            moduleDoc = snapshot.data();
+            return Promise.resolve();
+        }
+    })
+    // Check programme exists
+    .then(() => {
+        return firestore.collection('programmes').doc(programmeId).get();
+    })
+    .then(snapshot => {
+        if(!snapshot.exists){
+            return Promise.reject(Error("Programme not found"));
+        }else{
+            programmeDoc = snapshot.data();
+            return Promise.resolve();
+        }
+    })
+    // Check user is authorised
+    .then(() => {
+        return admin.auth().verifyIdToken(idToken);
+    })
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        if(!programmeDoc.administrators.includes(uid)){
+            return Promise.reject(Error("User not permitted to perform this action"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // Check this module is assigned to this programme
+    .then(() => {
+        if(!programmeDoc.modules.includes(moduleId)){
+            return Promise.reject(Error("Module not assigned to this programme"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // Check programme is not published
+    .then(() => {
+        if(programmeDoc.published){
+            return Promise.reject(Error("Cannot edit a published programme"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // Unassign module
+    .then(() => {
+        return firestore.collection('programmes').doc(programmeId).update({
+            modules: programmeDoc.modules.filter((value, index, arr) => value!= moduleId)
+        });
+    })
+    .then(result => {
+        res.status(200).send("Module unassigned successfully")
+        return;
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+        return;
+    });
 });
 
 exports.addAdministrator = functions.https.onRequest((req, res) => {
