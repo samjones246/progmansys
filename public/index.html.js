@@ -47,6 +47,11 @@ initApp = function() {
                 });
             })
         });
+        $("#logout").on("click", () =>{
+            firebase.auth().signOut().then(()=>{
+                location.reload();
+            })
+        })
         user.getIdToken().then(idToken => {
             $("#token").text(idToken);
         });
