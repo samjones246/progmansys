@@ -362,12 +362,12 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
             return Promise.resolve();
         }
     })
-    // Check user is authorised
+    // Check requesting user is an administrator
     .then(() => {
         return admin.auth().verifyIdToken(idToken);
     })
     .then(decodedToken => {
-        uid = decodedToken.uid;
+        uid = decodedToken.uid; 
         if(!programmeDoc.administrators.includes(uid)){
             return Promise.reject(Error("User not permitted to perform this action"));
         }else{
@@ -390,7 +390,7 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
             return Promise.resolve();
         }
     })
-    // Unassign module
+    // ACT1 - Unassign module
     .then(() => {
         return firestore.collection('programmes').doc(programmeId).update({
             modules: programmeDoc.modules.filter((value, index, arr) => value!= moduleId)
@@ -408,15 +408,241 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
 });
 
 exports.addAdministrator = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const programme = req.body.programme;
+    const targetUid = req.body.targetUid;
+    const idToken = req.body.idToken;
+    var uid;
+    var programmeDoc;
+    var programmeRef;
+    // GRD1 - Requesting user is logged in
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        return Promise.resolve();
+    })
+    // GRD2 - Target user is a registered user
+    .then(() => {
+        return admin.auth().getUser(targetUid);
+    })
+    .then(userRecord => {
+        return;
+    })
+    // GRD3 - Programme exists
+    .then(() => {
+        return firestore.collection('programmes').doc(programme).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            programmeDoc = snapshot.data();
+            programmeRef = snapshot.ref;
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Programme not found"))
+        }
+    })
+    // GRD4 - Requesting user is programme leader
+    .then(() => {
+        if(programmeDoc.leader == uid){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("User is not permitted to perform this action"));
+        }
+    })
+    // GRD5 - Target user is not already an administrator
+    .then(() => {
+        if(programmeDoc.administrators.includes(targetUid)){
+            return Promise.reject(Error("Target user is already an administrator"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD6 - Programme is not published
+    .then(() => {
+        if(programmeDoc.published){
+            return Promise.reject(Error("Cannot edit a published programme"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // ACT1 - Add target user to administrators
+    .then(() => {
+        programmeDoc.administrators.push(targetUid);
+        return programmeRef.update({
+            administrators: programmeDoc.administrators
+        })
+    })
+    .then(result => {
+        res.send(targetUid + " is now an administrator for "+programmeDoc.name);
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+    });
 });
 
 exports.removeAdministrator = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const idToken = req.body.idToken;
+    const targetUid = req.body.targetUid;
+    const programme = req.body.programme;
+    var uid;
+    var programmeDoc;
+    var programmeRef;
+    // GRD1 - Requesting user is logged in
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        return;
+    })
+    // GRD2 - Target user is a registered user
+    .then(() => {
+        return admin.auth().getUser(targetUid);
+    })
+    .then(userRecord => {
+        return;
+    })
+    // GRD3 - Programme exists
+    .then(() => {
+        return firestore.collection("programmes").doc(programme).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            programmeDoc = snapshot.data();
+            programmeRef = snapshot.ref;
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Programme not found"));
+        }
+    })
+    // GRD4 - Requesting user is programme leader
+    .then(() => {
+        if(programmeDoc.leader == uid){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("User is not permitted to perform this action"));
+        }
+    })
+    // GRD5 - Target user is an administrator
+    .then(() => {
+        if(!programmeDoc.administrators.includes(targetUid)){
+            return Promise.reject(Error("Target user is not an administrator"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD6 - Requesting user is not the target user
+    .then(() => {
+        if(targetUid == uid){
+            return Promise.reject(Error("Cannot remove self from administrators"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD7 - Programme is not published
+    .then(() => {
+        if(programmeDoc.published){
+            return Promise.reject(Error("Cannot edit a published programme"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // ACT1 - Remove target user from administrators
+    .then(() => {
+        programmeDoc.administrators = programmeDoc.administrators.filter((value, index, arr) => value!=targetUid);
+        return programmeRef.update({
+            administrators: programmeDoc.administrators
+        })
+    })
+    .then(result => {
+        res.send(targetUid + " is no longer an administrator for " + programmeDoc.name);
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+    });
 });
 
 exports.transferProgrammeOwnership = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const idToken = req.body.idToken;
+    const targetUid = req.body.targetUid;
+    const programme = req.body.programme;
+    var uid;
+    var programmeDoc;
+    var programmeRef;
+    // GRD1 - Requesting user is logged in
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        return;
+    })
+    // GRD2 - Target user is a registered user
+    .then(() => {
+        return admin.auth().getUser(targetUid);
+    })
+    .then(userRecord => {
+        return;
+    })
+    // GRD3 - Programme exists
+    .then(() => {
+        return firestore.collection("programmes").doc(programme).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            programmeDoc = snapshot.data();
+            programmeRef = snapshot.ref;
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Programme not found"));
+        }
+    })
+    // GRD4 - Requesting user is programme leader
+    .then(() => {
+        if(programmeDoc.leader == uid){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Only the programme leader can perform this action"));
+        }
+    })
+    // GRD5 - Target user is an administrator
+    .then(() => {
+        if(!programmeDoc.administrators.includes(targetUid)){
+            return Promise.reject(Error("Target user is not an administrator"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD6 - Requesting user is not the target user
+    .then(() => {
+        if(targetUid == uid){
+            return Promise.reject(Error("Cannot remove self from administrators"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD7 - Programme is not published
+    .then(() => {
+        if(programmeDoc.published){
+            return Promise.reject(Error("Cannot edit a published programme"));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // ACT1 - Transfer programme ownership
+    .then(() => {
+        programmeDoc.administrators = programmeDoc.administrators.filter((value, index, arr) => value!=targetUid);
+        return programmeRef.update({
+            leader: targetUid
+        })
+    })
+    .then(result => {
+        res.send("Ownership of " + programmeDoc.name + " transferred from " + uid + " to " + targetUid);
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+    });
 });
 
 exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
