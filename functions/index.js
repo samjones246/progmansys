@@ -1,5 +1,6 @@
 // The Cloud Functions for Firebase SDK to create Cloud Functions and setup triggers.
 const functions = require('firebase-functions');
+const FieldValue = require('firebase-admin').firestore.FieldValue;
 
 // The Firebase Admin SDK to access the Firebase Realtime Database.
 var admin = require("firebase-admin");
@@ -737,6 +738,7 @@ exports.assignProgrammeOutcome = functions.https.onRequest((req, res) => {
             return Promise.reject(Error("Programme not found"));
         }
     })
+    // GRD3 - Outcome is a string
     .then(() => {
         if(typeof outcome == 'string'){
             return Promise.resolve();
@@ -838,19 +840,15 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
             return Promise.reject(Error("Only the module leader can perform this action"));
         }
     })
-    // GRD5 - The outcome is not already an outcome of the module
+    // GRD5 - This outcome is not already assigned to this module
     .then(() => {
         var exists = false;
-        moduleDoc.outcomes.forEach(element => {
-            if(element === outcome){
-                exists = true;
+        for(element in moduleDoc.outcomes) {
+            if(moduleDoc.outcomes[element] === outcome){
+                return Promise.reject(Error("This module has already been assigned an identical outcome"));
             }
-        });
-        if(exists){
-            return Promise.reject(Error("This module has already been assigned an identical outcome"));
-        }else{
-            return Promise.resolve();
         }
+        return Promise.resolve();
     })
     // GRD6 - Module is not a member of any published programme
     .then(() => {
@@ -866,10 +864,16 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
     })
     // ACT1 - Assign module outcome
     .then(() => {
-        moduleDoc.outcomes.push(outcome);
-        return moduleRef.update({
-            outcomes: moduleDoc.outcomes
-        })
+        var newId;
+        var maxId = Object.keys(moduleDoc.outcomes).length;
+        for(i=0;i<=maxId;i++){
+            if(!moduleDoc.outcomes.hasOwnProperty(i.toString())){
+                newId = i.toString();
+                break;
+            }
+        }
+        moduleDoc.outcomes[newId] = outcome;
+        return moduleRef.update("outcomes."+newId, outcome);
     })
     .then(result => {
         res.send(moduleDoc.outcomes);
@@ -921,7 +925,7 @@ exports.unassignProgrammeOutcome = functions.https.onRequest((req, res) => {
     })
     // GRD5 - The outcome is an outcome of the programme
     .then(() => {
-        if(outcomeId < programmeDoc.outcomes.length){
+        if(programmeDoc.outcomes.hasOwnProperty(outcomeId)){
             return Promise.resolve();
         }else{
             return Promise.reject(Error("Invalid outcome ID"));
@@ -935,18 +939,14 @@ exports.unassignProgrammeOutcome = functions.https.onRequest((req, res) => {
             return Promise.resolve();
         }
     })
-    // ACT1 - Unassign programme outcome
+    // ACT1 & ACT2 - Unassign programme outcome, remove mapping
     .then(() => {
-        programmeDoc.outcomes.splice(outcomeId, 1);
-        return programmeRef.update({
-            outcomes: programmeDoc.outcomes
-        })
+        delete programmeDoc.outcomes[outcomeId]
+        return programmeRef.update("outcomes."+outcomeId, FieldValue.delete(), "mapping."+outcomeId, FieldValue.delete())
     })
     .then(result => {
         res.send(programmeDoc.outcomes);
     })
-    // ACT2 - Remove outcome mapping
-    // ~code~
     // If a guard failed, respond with the error
     .catch(error => {
         res.status(400).send(error.message);
@@ -961,6 +961,7 @@ exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
     var uid;
     var moduleDoc;
     var moduleRef;
+    var programmes;
     // GRD1 - Requesting user is logged in
     admin.auth().verifyIdToken(idToken)
     .then(decodedToken => {
@@ -977,20 +978,24 @@ exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
             moduleRef = snapshot.ref;
             return Promise.resolve();
         }else{
-            return Promise.reject(Error("module not found"));
+            return Promise.reject(Error("Module not found"));
         }
     })
     // GRD4 - Requesting user is module leader
     .then(() => {
-        if(moduleDoc.leader == uid){
-            return Promise.resolve();
+        return admin.auth().verifyIdToken(idToken);
+    })
+    .then(decodedToken => {
+        uid = decodedToken.uid; 
+        if(!moduleDoc.leader === uid){
+            return Promise.reject(Error("User not permitted to perform this action"));
         }else{
-            return Promise.reject(Error("Only the module leader can perform this action"));
+            return Promise.resolve();
         }
     })
     // GRD5 - The outcome is an outcome of the module
     .then(() => {
-        if(outcomeId < moduleDoc.outcomes.length){
+        if(moduleDoc.outcomes.hasOwnProperty(outcomeId)){
             return Promise.resolve();
         }else{
             return Promise.reject(Error("Invalid outcome ID"));
@@ -1006,19 +1011,30 @@ exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
                 return Promise.reject("Cannot edit a module which is part of a published programme");
             }
         })
+        programmes = snapshot;
         return Promise.resolve();
     })
     // ACT1 - Unassign module outcome
     .then(() => {
-        moduleDoc.outcomes.splice(outcomeId, 1);
-        return moduleRef.update({
-            outcomes: moduleDoc.outcomes
+        delete moduleDoc.outcomes[outcomeId]
+        return moduleRef.update("outcomes."+outcomeId, FieldValue.delete(), "mapping."+outcomeId, FieldValue.delete())
+    })
+    // ACT2 - Remove mappings
+    .then(result => {
+        var batch = firestore.batch();
+        programmes.forEach(document => {
+            var mapping = document.data().mapping;
+            for (programmeOutcome in mapping){
+                if(mapping[programmeOutcome][module]){
+                    batch.update(document.ref, "mapping."+programmeOutcome+"."+module, FieldValue.arrayRemove(outcomeId));
+                }
+            }
         })
+        return batch.commit();
     })
     .then(result => {
         res.send(moduleDoc.outcomes);
     })
-    // ACT2 - Remove outcome mapping
     // If a guard failed, respond with the error
     .catch(error => {
         res.status(400).send(error.message);
@@ -1029,9 +1045,9 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
     // Setup variables
     const idToken = req.body.idToken;
     const programme = req.body.programme;
-    const programmeOutcome = req.body.programmeoutcome;
+    const programmeOutcome = req.body.programmeOutcome;
     const module = req.body.module;
-    const moduleOutcome = req.body.moduleoutcome;
+    const moduleOutcome = req.body.moduleOutcome;
     var uid;
     var programmeDoc;
     var programmeRef;
@@ -1058,7 +1074,7 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
     })
     // GRD3 & GRD8 - Programme outcome exists
     .then(() => {
-        if(programmeOutcome < programmeDoc.outcomes.length){
+        if(programmeDoc.outcomes.hasOwnProperty(programmeOutcome)){
             return Promise.resolve();
         }else{
             return Promise.reject(Error("Invalid programme outcome"))
@@ -1079,7 +1095,7 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
     })
     // GRD5 & GRD9 - Module outcome exists
     .then(() => {
-        if(moduleOutcome < moduleDoc.outcomes.length){
+        if(moduleDoc.outcomes.hasOwnProperty(moduleOutcome)){
             return Promise.resolve();
         }else{
             return Promise.reject(Error("Invalid module outcome"))
@@ -1107,8 +1123,8 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
     })
     // GRD10 - Mapping does not already exist
     .then(() => {
-        if(programmeDoc.mapping[programmeOutcome] != null){
-            if(programmeDoc.mapping[programmeOutcome][module] != null){
+        if(programmeDoc.mapping[programmeOutcome]){
+            if(programmeDoc.mapping[programmeOutcome][module]){
                 if(programmeDoc.mapping[programmeOutcome][module].includes(moduleOutcome)){
                     return Promise.reject(Error("Mapping already exists"));
                 }
@@ -1122,6 +1138,9 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
         return programmeRef.update({
             mapping: programmeDoc.mapping
         })
+    })
+    .then(result => {
+        res.send(programmeDoc.mapping);
     })
     // If a guard failed, respond with the error
     .catch(error => {
@@ -1160,9 +1179,9 @@ exports.unmapOutcome = functions.https.onRequest((req, res) => {
             return Promise.reject(Error("Programme not found"));
         }
     })
-    // GRD3 - Programme outcome exists
+    // GRD3 & GRD8- Programme outcome exists
     .then(() => {
-        if(programmeOutcome < programmeDoc.outcomes.length){
+        if(programmeDoc.outcomes.hasOwnProperty(programmeOutcome)){
             return Promise.resolve();
         }else{
             return Promise.reject(Error("Invalid programme outcome"))
@@ -1181,9 +1200,9 @@ exports.unmapOutcome = functions.https.onRequest((req, res) => {
             return Promise.reject(Error("module not found"));
         }
     })
-    // GRD5 - Module outcome exists
+    // GRD5 & GRD9 - Module outcome exists
     .then(() => {
-        if(moduleOutcome < moduleDoc.outcomes.length){
+        if(moduleDoc.outcomes.hasOwnProperty(moduleOutcome)){
             return Promise.resolve();
         }else{
             return Promise.reject(Error("Invalid module outcome"))
@@ -1199,23 +1218,38 @@ exports.unmapOutcome = functions.https.onRequest((req, res) => {
     })
     // GRD7 - Requesting user is an administrator of the programme
     .then(() => {
-        return admin.auth().verifyIdToken(idToken);
-    })
-    .then(decodedToken => {
-        uid = decodedToken.uid; 
         if(!programmeDoc.administrators.includes(uid)){
             return Promise.reject(Error("User not permitted to perform this action"));
         }else{
             return Promise.resolve();
         }
     })
-    // GRD8 - Programme outcome is assigned to programme
-    // GRD9 - Module outcome is assigned to module
     // GRD10 - Mapping exists
+    .then(()=>{
+        if(programmeDoc.mapping[programmeOutcome][module]){
+            if(programmeDoc.mapping[programmeOutcome][module].includes(moduleOutcome)){
+                return Promise.resolve();
+            }
+        }
+        Promise.reject(Error("Mapping does not exist"));
+    })
     // ACT1 - Unmap Outcome
+    .then(() => {
+        programmeDoc.mapping[programmeOutcome][module].push(moduleOutcome);
+        return programmeRef.update("mapping."+programmeOutcome+"."+module, FieldValue.arrayRemove(moduleOutcome));
+    })
+    .then(result => {
+        return programmeRef.get();
+    }) 
+    .then(snapshot => {
+        res.send(snapshot.mapping);
+        return;
+    })
     // If a guard failed, respond with the error
     .catch(error => {
+        console.log(error.stack);
         res.status(400).send(error.message);
+        return;
     });
 });
 
