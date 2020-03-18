@@ -150,8 +150,8 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
 exports.assignModule = functions.https.onRequest(async (req,res) => {
     cors(req, res, () => {
         // Setup variables
-        const programmeId = req.body.programmeId;
-        const moduleId = req.body.moduleId;
+        const programme = req.body.programme;
+        const module = req.body.module;
         const idToken = req.body.idToken;
         var uid;
         var programmeDoc;
@@ -236,7 +236,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
 exports.deleteModule = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
         // Setup variables
-        const moduleId = req.body.moduleId;
+        const module = req.body.module;
         const idToken = req.body.idToken;
         var uid;
         var moduleRef;
@@ -293,7 +293,7 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
 exports.deleteProgramme = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
         // Setup variables
-        const programmeId = req.body.programmeId;
+        const programme = req.body.programme;
         const idToken = req.body.idToken;
         var uid;
         var programmeRef;
