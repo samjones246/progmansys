@@ -16,7 +16,7 @@ initApp = function() {
             user.getIdToken().then(idToken => {
                 axios.post(apiRoot+"/createProgramme", {
                     name: $("#programmeName").value,
-                    duration: $("#programmeDuration").value,
+                    duration: parseInt($("#programmeDuration").value),
                     idToken: idToken
                 }).then(response => {
                     console.log(response.data)
@@ -27,9 +27,9 @@ initApp = function() {
             user.getIdToken().then(idToken => {
                 axios.post(apiRoot+"/createModule", {
                     name: $("#moduleName").val(),
-                    year: $("#moduleYear").val(),
-                    semester: $("#moduleSemester").val(),
-                    credits: $("#moduleCredits").val(),
+                    year: parseInt($("#moduleYear").val()),
+                    semester: parseInt($("#moduleSemester").val()),
+                    credits: parseInt($("#moduleCredits").val()),
                     idToken: idToken
                 }).then(response => {
                     console.log(response.data);
@@ -41,7 +41,7 @@ initApp = function() {
                 axios.post(apiRoot+"/assignModule", {
                     programmeId: $("#programmeId").val(),
                     moduleId: $("#moduleId").val(),
-                    idToken: user.idToken
+                    idToken: idToken
                 }).then(response => {
                     console.log(response.data)
                 });
