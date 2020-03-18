@@ -1,6 +1,7 @@
 // The Cloud Functions for Firebase SDK to create Cloud Functions and setup triggers.
 const functions = require('firebase-functions');
 const FieldValue = require('firebase-admin').firestore.FieldValue;
+const FieldPath = require('firebase-admin').firestore.FieldPath;
 
 // The Firebase Admin SDK to access the Firebase Realtime Database.
 var admin = require("firebase-admin");
@@ -131,12 +132,14 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
             return documentRef.get();
         })
         .then(doc => {
-            res.send(doc.data());
+            res.send({
+                id: doc.id,
+                data: doc.data()
+            });
             return;
         })
         .catch(error => {
             res.status(400).send(error.message);
-            console.log(error.message);
             return;
         });
     });
@@ -857,7 +860,7 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
     .then(snapshot => {
         snapshot.docs.forEach(element => {
             if(element.published){
-                return Promise.reject("Cannot edit a module which is part of a published programme");
+                return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
             }
         })
         return Promise.resolve();
@@ -1008,7 +1011,7 @@ exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
     .then(snapshot => {
         snapshot.docs.forEach(element => {
             if(element.published){
-                return Promise.reject("Cannot edit a module which is part of a published programme");
+                return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
             }
         })
         programmes = snapshot;
@@ -1259,8 +1262,9 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
     const module1 = req.body.module1;
     const module2 = req.body.module2;
     var uid;
-    var moduleDoc;
-    var moduleRef;
+    var module1Doc;
+    var module2Doc;
+    var module1Ref;
     // GRD41 - Requesting user is logged in
     admin.auth().verifyIdToken(idToken)
     .then(decodedToken => {
@@ -1273,11 +1277,11 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
     })
     .then(snapshot => {
         if(snapshot.exists){
-            moduleDoc = snapshot.data();
-            moduleRef = snapshot.ref;
+            module1Doc = snapshot.data();
+            module1Ref = snapshot.ref;
             return Promise.resolve();
         }else{
-            return Promise.reject(Error("module not found"));
+            return Promise.reject(Error("Module not found"));
         }
     })
     // GRD43 - Module 2 exists
@@ -1286,20 +1290,28 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
     })
     .then(snapshot => {
         if(snapshot.exists){
+            module2Doc = snapshot.data();
             return Promise.resolve();
         }else{
-            return Promise.reject(Error("module not found"));
+            return Promise.reject(Error("Module not found"));
         }
     })
     // GRD44 - Requesting user is module leader of module 1
     .then(() => {
-        if(moduleDoc.leader == uid){
+        if(module1Doc.leader == uid){
             return Promise.resolve();
         }else{
             return Promise.reject(Error("Only the module leader can perform this action"));
         }
     })
     // GRD47 - Module 2 is not already a prerequisite of module 1
+    .then(() => {
+        if(module1Doc.prerequisites.includes(module2)){
+            return Promise.reject(Error("Prerequisite relation already exists"))
+        }else{
+            return Promise.resolve();
+        }
+    })
     // GRD48 - Module 1 is not module 2
     .then(() => {
         if(module1 == module2){
@@ -1308,9 +1320,38 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
             return Promise.resolve();
         }
     })
-    // GRD49 - Module is not a member of any published programme
+    // GRD49 - Module1 is not a member of any published programme
+    .then(() => {
+        return firestore.collection('programmes').where("modules", "array-contains", module1).get();
+    })
+    .then(snapshot => {
+        snapshot.docs.forEach(element => {
+            if(element.published){
+                return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+            }
+        })
+        return Promise.resolve();
+    })
     // GRD51 & GRD52 - Module 2 occurs before module 1
+    .then(() => {
+        if(module2Doc.year <= module1Doc.year){
+            if(module2Doc.semester < module1Doc.semester){
+                return Promise.resolve();
+            }
+        }
+        return Promise.reject(Error("Module 2 must occur before module 1"));
+    })
     // ACT41 - Assign Prerequisite
+    .then(() => {
+        return module1Ref.update("prerequisites", FieldValue.arrayUnion(module2));
+    })
+    .then(result => {
+        return module1Ref.get();
+    })
+    .then(snapshot => {
+        res.send(snapshot.data().prerequisites);
+        return;
+    })
     // If a guard failed, respond with the error
     .catch(error => {
         res.status(400).send(error.message);
@@ -1318,19 +1359,411 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
 });
 
 exports.unassignPrerequisite = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const idToken = req.body.idToken;
+    const module1 = req.body.module1;
+    const module2 = req.body.module2;
+    var uid;
+    var module1Doc;
+    var module2Doc;
+    var module1Ref;
+    // GRD41 - Requesting user is logged in
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        return;
+    })
+    // GRD42 - Module 1 exists
+    .then(() => {
+        return firestore.collection("modules").doc(module1).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            module1Doc = snapshot.data();
+            module1Ref = snapshot.ref;
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Module not found"));
+        }
+    })
+    // GRD43 - Module 2 exists
+    .then(() => {
+        return firestore.collection("modules").doc(module2).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            module2Doc = snapshot.data();
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Module not found"));
+        }
+    })
+    // GRD44 - Requesting user is module leader of module 1
+    .then(() => {
+        if(module1Doc.leader == uid){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Only the module leader can perform this action"));
+        }
+    })
+    // GRD47 - Module 2 is a prerequisite of module 1
+    .then(() => {
+        if(module1Doc.prerequisites.includes(module2)){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Prerequisite relation does not exist"))
+        }
+    })
+    // GRD49 - Module1 is not a member of any published programme
+    .then(() => {
+        return firestore.collection('programmes').where("modules", "array-contains", module1).get();
+    })
+    .then(snapshot => {
+        snapshot.docs.forEach(element => {
+            if(element.published){
+                return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+            }
+        })
+        return Promise.resolve();
+    })
+    // ACT41 - Assign Prerequisite
+    .then(() => {
+        return module1Ref.update("prerequisites", FieldValue.arrayRemove(module2));
+    })
+    .then(result => {
+        return module1Ref.get();
+    })
+    .then(snapshot => {
+        res.send(snapshot.prerequisites);
+        return;
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+    });
 });
 
 exports.changeSemester = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const idToken = req.body.idToken;
+    const module = req.body.module;
+    const semester = req.body.semester;
+    var uid;
+    var moduleDoc;
+    var moduleRef;
+    // GRD1 - Requesting user is logged in
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        return;
+    })
+    // GRD2 - Module exists
+    .then(() => {
+        return firestore.collection("modules").doc(module).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            moduleDoc = snapshot.data();
+            moduleRef = snapshot.ref;
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Module not found"));
+        }
+    })
+    // GRD3 - Requesting user is module leader
+    .then(() => {
+        if(moduleDoc.leader == uid){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Only the module leader can perform this action"));
+        }
+    })
+    // GRD4 - Semester is valid
+    .then(() => {
+        if([1,2].includes(semester)){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Semester can only be 1 or 2"));
+        }
+    })
+    // GRD5 - Semester is different from currently assigned semester
+    .then(() => {
+        if(semester === moduleDoc.semester){
+            return Promise.reject(Error("Must specify a different semester to the one already assigned"))
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD6 - Module will still occur after its prerequisites
+    .then(() => {
+        var promises = [];
+        for(i=0;i<moduleDoc.prerequisites.length;i++){
+            promises[i] = firestore.collection("modules").doc(moduleDoc.prerequisites[i]).get();
+        }
+        return Promise.all(promises);
+    })
+    .then(snapshots => {
+        var reject = [];
+        snapshots.forEach(prereq => {
+            if(prereq.data().year === moduleDoc.year && prereq.data().semester >= semester){
+                reject.push(prereq.data().name);
+            }
+        })
+        if(reject.length > 0){
+            return Promise.reject(Error("Change would invalidate prerequisite relation with prerequisites: "+reject.toString()));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD7 - Module will still occur before its successors
+    .then(() => {
+        return firestore.collection("modules").where("prerequisites", "array-contains", module).get();
+    })
+    .then(snapshot => {
+        var reject = [];
+        snapshot.docs.forEach(successor => {
+            if(successor.data().year === moduleDoc.year && successor.data().semester <= semester){
+                reject.push(successor.data().name);
+            }
+        })
+        if(reject.length > 0){
+            return Promise.reject(Error("Change would invalidate prerequisite relation with successors: "+reject.toString()));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD8 - Module is not a member of any published programme
+    .then(() => {
+        return firestore.collection('programmes').where("modules", "array-contains", module).get();
+    })
+    .then(snapshot => {
+        snapshot.docs.forEach(element => {
+            if(element.published){
+                return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+            }
+        })
+        return Promise.resolve();
+    })
+    // ACT1 - Change semester
+    .then(() => {
+        return moduleRef.update("semester", semester);
+    })
+    .then(result => {
+        return moduleRef.get();
+    })
+    .then(snapshot => {
+        res.send(snapshot.data());
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+    });
 });
 
 exports.changeYear = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const idToken = req.body.idToken;
+    const module = req.body.module;
+    const year = req.body.year;
+    var uid;
+    var moduleDoc;
+    var moduleRef;
+    // GRD1 - Requesting user is logged in
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        return;
+    })
+    // GRD2 - Module exists
+    .then(() => {
+        return firestore.collection("modules").doc(module).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            moduleDoc = snapshot.data();
+            moduleRef = snapshot.ref;
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Module not found"));
+        }
+    })
+    // GRD3 - Requesting user is module leader
+    .then(() => {
+        if(moduleDoc.leader == uid){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Only the module leader can perform this action"));
+        }
+    })
+    // GRD4 - Year is valid
+    .then(() => {
+        if([1,2,3,4].includes(year)){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Year can only be 1-4"));
+        }
+    })
+    // GRD5 - Year is different from currently assigned year
+    .then(() => {
+        if(year === moduleDoc.year){
+            return Promise.reject(Error("Must specify a different year to the one already assigned"))
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD6 - Module will still occur after its prerequisites
+    .then(() => {
+        var promises = [];
+        for(i=0;i<moduleDoc.prerequisites.length;i++){
+            promises[i] = firestore.collection("modules").doc(moduleDoc.prerequisites[i]).get();
+        }
+        return Promise.all(promises);
+    })
+    .then(snapshots => {
+        var reject = [];
+        snapshots.forEach(prereq => {
+            if(prereq.data().year > year || (prereq.data().year === year && prereq.data().semester >= moduleDoc.semester)){
+                reject.push(prereq.data().name);
+            }
+        })
+        if(reject.length > 0){
+            return Promise.reject(Error("Change would invalidate prerequisite relation with prerequisites: "+reject.toString()));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD7 - Module will still occur before modules which it is a prerequisite of
+    .then(() => {
+        return firestore.collection("modules").where("prerequisites", "array-contains", module).get();
+    })
+    .then(snapshot => {
+        var reject = [];
+        snapshot.docs.forEach(successor => {
+            if(successor.data().year < year || (successor.data().year === year && successor.data().semester <= moduleDoc.semester)){
+                reject.push(successor.data().name);
+            }
+        })
+        if(reject.length > 0){
+            return Promise.reject(Error("Change would invalidate prerequisite relation with successors: "+reject.toString()));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD8 - Module is not a member of any published programme
+    .then(() => {
+        return firestore.collection('programmes').where("modules", "array-contains", module).get();
+    })
+    .then(snapshot => {
+        snapshot.docs.forEach(element => {
+            if(element.published){
+                return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+            }
+        })
+        return Promise.resolve();
+    })
+    // ACT1 - Change year
+    .then(() => {
+        return moduleRef.update("year", year);
+    })
+    .then(result => {
+        return moduleRef.get();
+    })
+    .then(snapshot => {
+        res.send(snapshot.data());
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+    });
 });
 
 exports.changeDuration = functions.https.onRequest((req, res) => {
-    res.send("Not yet implemented");
+    // Setup variables
+    const idToken = req.body.idToken;
+    const programme = req.body.programme;
+    const duration = req.body.duration;
+    var uid;
+    var programmeDoc;
+    var programmeRef;
+    // GRD1 - Requesting user is logged in
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        uid = decodedToken.uid;
+        return;
+    })
+    // GRD2 - Programme exists
+    .then(() => {
+        return firestore.collection("programmes").doc(programme).get();
+    })
+    .then(snapshot => {
+        if(snapshot.exists){
+            programmeDoc = snapshot.data();
+            programmeRef = snapshot.ref;
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Programme not found"));
+        }
+    })
+    // GRD3 - Duration is valid
+    .then(() => {
+        if([1,2,3,4].includes(duration)){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Duration can only be 1-4"));
+        }
+    })
+    // GRD4 - Requesting user is a programme administrator
+    .then(() => {
+        if(programmeDoc.administrators.includes(uid)){
+            return Promise.resolve();
+        }else{
+            return Promise.reject(Error("Only a programme administrator can perform this action"));
+        }
+    })
+    // GRD5 - Duration is different from currently assigned duration
+    .then(() => {
+        if(duration === programmeDoc.duration){
+            return Promise.reject(Error("Must specify a different duration to the one already assigned"))
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD6 - No modules on this programme have a year greater than the new duration
+    .then(() => {
+        var promises = [];
+        for(i=0;i<programmesDoc.modules.length;i++){
+            promises[i] = firestore.collection("programmes").doc(programmeDoc.modules[i]).get();
+        }
+        return Promise.all(promises);
+    })
+    .then(snapshots => {
+        var reject = [];
+        snapshots.forEach(module => {
+            if(module.data().year > duration){
+                reject.push(module.data().name);
+            }
+        })
+        if(reject.length > 0){
+            return Promise.reject(Error("Modules on this programme would fall outside the duration: "+reject.toString()));
+        }else{
+            return Promise.resolve();
+        }
+    })
+    // GRD7 - Programme is not published
+    // ACT1 - Change duration
+    .then(() => {
+        return moduleRef.update("duration", duration);
+    })
+    .then(result => {
+        return moduleRef.get();
+    })
+    .then(snapshot => {
+        res.send(snapshot.data());
+    })
+    // If a guard failed, respond with the error
+    .catch(error => {
+        res.status(400).send(error.message);
+    });
 });
 
 exports.publishProgramme = functions.https.onRequest((req, res) => {
