@@ -64,3 +64,54 @@ initApp = function() {
 window.addEventListener("load", function(){
     initApp();
 });
+var app = new Vue({
+    el: '#app',
+    data: {
+        functions: functionsSpec,
+        selected: null
+    },
+    methods: {
+        convertString: function (input) {
+            input = input.replace(/([A-Z])/g, " $1");
+            input = input.charAt(0).toUpperCase() + input.slice(1);
+            return input;
+        },
+        sendRequest: async function () {
+            if(!app.selected){
+                $("#response").text("No function selected");
+            }
+            console.log(app.selected);
+            $("#response").text("Processing...");
+            var selectedObject = app.functions[app.selected];
+            var data = {};
+            for(k in selectedObject){
+                if(selectedObject[k] === "text"){
+                    data[k] = $("#"+k).val();
+                }else{
+                    data[k] = parseInt($("#"+k).val());
+                }
+            }
+            firebase.auth().currentUser.getIdToken()
+            .then(idToken => {
+                data["idToken"] = idToken;
+                return;
+            })
+            .then(() => {
+                return axios.post(apiRoot+"/"+app.selected, data)
+            })
+            .then(response => {
+                $("#response").text(JSON.stringify(response.data))
+                console.log(response.data)
+            })
+            .catch(function (error) {
+                if (error.response) {
+                  $("#response").text(error.response.data);
+                } else if (error.request) {
+                  $("#response").text(error.request);
+                } else {
+                  $("#response").text(error.message);
+                }
+            });
+        }
+    }
+});

@@ -1,103 +1,104 @@
-functions = {
-    "createProgramme":{
-        "name":"string",
-        "duration":"number"
+functionsSpec = {
+    createProgramme:{
+        name:"text",
+        duration:"number"
     },
-    "deleteProgramme":{
-        "programme":"string"
+    deleteProgramme:{
+        programme:"text"
     },
-    "createModule":{
-        "name":"string",
-        "year":"number",
-        "semester":"string"
+    createModule:{
+        name:"text",
+        year:"number",
+        semester:"number",
+        credits:"number"
     },
-    "deleteModule":{
-        "module":"string"
+    deleteModule:{
+        module:"text"
     },
-    "assignModule":{
-        "programme":"string",
-        "module":"string"
+    assignModule:{
+        programme:"text",
+        module:"text"
     },
-    "unassignModule":{
-        "programme":"string",
-        "module":"string"
+    unassignModule:{
+        programme:"text",
+        module:"text"
     },
-    "addAdministrator":{
-        "programme":"string",
-        "targetUid":"string"
+    addAdministrator:{
+        programme:"text",
+        targetUid:"text"
     },
-    "removeAdministrator":{
-        "programme":"string",
-        "targetUid":"string"
+    removeAdministrator:{
+        programme:"text",
+        targetUid:"text"
     },
-    "transferProgrammeOwnership":{
-        "programme":"string",
-        "targetUid":"string"
+    transferProgrammeOwnership:{
+        programme:"text",
+        targetUid:"text"
     },
-    "transferModuleOwnership":{
-        "module":"string",
-        "targetUid":"string"
+    transferModuleOwnership:{
+        module:"text",
+        targetUid:"text"
     },
-    "assignProgrammeOutcome":{
-        "programme":"string",
-        "outcome":"string"
+    assignProgrammeOutcome:{
+        programme:"text",
+        outcome:"text"
     },
-    "unassignProgrammeOutcome":{
-        "programme":"string",
-        "outcomeId":"string"
+    unassignProgrammeOutcome:{
+        programme:"text",
+        outcomeId:"text"
     },
-    "assignModuleOutcome":{
-        "module":"string",
-        "outcome":"string"
+    assignModuleOutcome:{
+        module:"text",
+        outcome:"text"
     },
-    "unassignModuleOutcome":{
-        "module":"string",
-        "outcomeId":"string"
+    unassignModuleOutcome:{
+        module:"text",
+        outcomeId:"text"
     },
-    "mapOutcome":{
-        "module":"string",
-        "programme":"string",
-        "moduleOutcome":"string",
-        "programmeOutcome":"string"
+    mapOutcome:{
+        module:"text",
+        programme:"text",
+        moduleOutcome:"text",
+        programmeOutcome:"text"
     },
-    "unmapOutcome":{
-        "module":"string",
-        "programme":"string",
-        "moduleOutcome":"string",
-        "programmeOutcome":"string"
+    unmapOutcome:{
+        module:"text",
+        programme:"text",
+        moduleOutcome:"text",
+        programmeOutcome:"text"
     },
-    "assignPrerequisite":{
-        "module1":"string",
-        "module2":"string"
+    assignPrerequisite:{
+        module1:"text",
+        module2:"text"
     },
-    "unassignPrerequisite":{
-        "module1":"string",
-        "module2":"string"
+    unassignPrerequisite:{
+        module1:"text",
+        module2:"text"
     },
-    "changeSemester":{
-        "module":"string",
-        "semester":"number"
+    changeSemester:{
+        module:"text",
+        semester:"number"
     },
-    "changeYear":{
-        "module":"string",
-        "year":"number"
+    changeYear:{
+        module:"text",
+        year:"number"
     },
-    "changeDuration":{
-        "programme":"string",
-        "duration":"number"
+    changeDuration:{
+        programme:"text",
+        duration:"number"
     },
-    "publishProgramme":{
-        "programme":"string"
+    publishProgramme:{
+        programme:"text"
     },
-    "unpublishProgramme":{
-        "programme":"string"
+    unpublishProgramme:{
+        programme:"text"
     },
-    "setCore":{
-        "programme":"string",
-        "module":"string"
+    setCore:{
+        programme:"text",
+        module:"text"
     },
-    "setOptional":{
-        "programme":"string",
-        "module":"string"
+    setOptional:{
+        programme:"text",
+        module:"text"
     }
 }
