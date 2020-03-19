@@ -2256,3 +2256,19 @@ exports.setOptional = functions.https.onRequest((req, res) => {
         });
     });
 });
+
+// Helper functions, will not affect system state
+exports.getUser = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        const uid = req.body.uid;
+        admin.auth().getUser(uid)
+        .then(userRecord => {
+            res.send(userRecord.toJSON())
+            return;
+        })
+        .catch(error => {
+            res.send(error.message)
+            return;
+        })
+    })
+});

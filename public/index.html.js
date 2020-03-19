@@ -126,7 +126,21 @@ const Programme = {
         firebase.firestore().collection("programmes").doc(this.$route.params.id).get()
         .then(snapshot => {
             this.programme = snapshot.data();
-            this.ready = true;
+            return axios.post(apiRoot+"/getUser",{
+                uid: this.programme.leader
+            })
+        })
+        .then(response => {
+            this.leader = response.data;
+            var promises = [];
+            for (admin in this.programme.administrators){
+                promises.push(axios.post(apiRoot+"/getUser"),{uid: admin})
+            }
+            return Promise.all(promises);
+        })
+        .then(responses => {
+            this.administrators = [];
+            responses.forEach()
         })
     },
     template:
@@ -139,6 +153,7 @@ const Programme = {
                         {{ programme.name }}
                     </h1>
                     <h2 class="subtitle">
+                        Led by {{ leader.displayName }}
                     </h2>
                 </div>
             </div>
