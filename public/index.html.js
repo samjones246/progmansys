@@ -9,66 +9,18 @@ var uiConfig = {
 };
 var ui = new firebaseui.auth.AuthUI(firebase.auth());
 const apiRoot = "http://localhost:5001/progmansys-6f164/us-central1"
-initApp = function() {
-    firebase.auth().onAuthStateChanged(user => {
-      if(user){
-        $("#createProgramme").on("click", () => {
-            user.getIdToken().then(idToken => {
-                axios.post(apiRoot+"/createProgramme", {
-                    name: $("#programmeName").value,
-                    duration: parseInt($("#programmeDuration").value),
-                    idToken: idToken
-                }).then(response => {
-                    console.log(response.data)
-                });
-            });
-        });
-        $("#createModule").on("click", () => {
-            user.getIdToken().then(idToken => {
-                axios.post(apiRoot+"/createModule", {
-                    name: $("#moduleName").val(),
-                    year: parseInt($("#moduleYear").val()),
-                    semester: parseInt($("#moduleSemester").val()),
-                    credits: parseInt($("#moduleCredits").val()),
-                    idToken: idToken
-                }).then(response => {
-                    console.log(response.data);
-                });
-            });
-        });
-        $("#assignModule").on("click", () => {
-            user.getIdToken().then(idToken => {
-                axios.post(apiRoot+"/assignModule", {
-                    programmeId: $("#programmeId").val(),
-                    moduleId: $("#moduleId").val(),
-                    idToken: idToken
-                }).then(response => {
-                    console.log(response.data)
-                });
-            })
-        });
-        $("#logout").on("click", () =>{
-            firebase.auth().signOut().then(()=>{
-                location.reload();
-            })
-        })
-        user.getIdToken().then(idToken => {
-            $("#token").text(idToken);
-        });
-        $("#controls").show();
-      }else{
-        ui.start('#firebaseui-auth-container', uiConfig);
-      }
-    });
-}
-window.addEventListener("load", function(){
-    initApp();
-});
 var app = new Vue({
     el: '#app',
     data: {
         functions: functionsSpec,
-        selected: null
+        selected: null,
+        user: null,
+        response: ""
+    },
+    computed: {
+        loggedIn: function () {
+            return user ? true : false
+        }
     },
     methods: {
         convertString: function (input) {
@@ -78,10 +30,10 @@ var app = new Vue({
         },
         sendRequest: async function () {
             if(!app.selected){
-                $("#response").text("No function selected");
+                this.response = "No function selected";
             }
             console.log(app.selected);
-            $("#response").text("Processing...");
+            this.response = "Processing...";
             var selectedObject = app.functions[app.selected];
             var data = {};
             for(k in selectedObject){
@@ -91,7 +43,7 @@ var app = new Vue({
                     data[k] = parseInt($("#"+k).val());
                 }
             }
-            firebase.auth().currentUser.getIdToken()
+            this.user.getIdToken()
             .then(idToken => {
                 data["idToken"] = idToken;
                 return;
@@ -100,18 +52,23 @@ var app = new Vue({
                 return axios.post(apiRoot+"/"+app.selected, data)
             })
             .then(response => {
-                $("#response").text(JSON.stringify(response.data))
+                this.response = JSON.stringify(response.data)
                 console.log(response.data)
             })
             .catch(function (error) {
                 if (error.response) {
-                  $("#response").text(error.response.data);
+                  this.response = error.response.data;
                 } else if (error.request) {
-                  $("#response").text(error.request);
+                  this.response = error.request;
                 } else {
-                  $("#response").text(error.message);
+                  this.response = error.message;
                 }
             });
         }
+    },
+    created: function(){
+        firebase.auth().onAuthStateChanged(user => {
+            this.user = user;
+        })
     }
 });
