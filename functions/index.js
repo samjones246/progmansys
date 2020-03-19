@@ -2020,18 +2020,239 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
 
 exports.unpublishProgramme = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
-        res.send("Not yet implemented");
+        // Setup variables
+        const idToken = req.body.idToken;
+        const programme = req.body.programme;
+        var uid;
+        var programmeDoc;
+        var programmeRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("programmes").doc(programme).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                programmeDoc = snapshot.data();
+                programmeRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Requesting user is the programme leader
+        .then(() => {
+            if(programmeDoc.leader === uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the programme leader can perform this action"));
+            }
+        })
+        // GRD4 - Programme is published
+        .then(() => {
+            if(!programmeDoc.published){
+                return Promise.reject(Error("Programme not published"));
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // ACT1 - Unpublish programme
+        .then(() => {
+            return programmeRef.update("published", false);
+        })
+        .then(result => {
+            return programmeRef.get();
+        })
+        .then(snapshot => {
+            res.send(snapshot.data());
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
     });
 });
 
 exports.setCore = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
-        res.send("Not yet implemented");
+        // Setup variables
+        const idToken = req.body.idToken;
+        const programme = req.body.programme;
+        const module = req.body.module;
+        var uid;
+        var programmeDoc;
+        var programmeRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("programmes").doc(programme).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                programmeDoc = snapshot.data();
+                programmeRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Module exists
+        .then(() => {
+            return firestore.collection("modules").doc(module).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Module not found"));
+            }
+        })
+        // GRD4 - Requesting user is an administrator
+        .then(() => {
+            if(programmeDoc.administrators.includes(uid)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only a programme administrator can perform this action"));
+            }
+        })
+        // GRD5 - Module is a member of programme
+        .then(() => {
+            if(programmeDoc.modules.includes(module)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("This module is not a member of this programme"));
+            }
+        })
+        // GRD6 - Module is not already core
+        .then(() => {
+            if(!programmeDoc.core.includes(module)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("This module is already core for this programme"));
+            }
+        })
+        // GRD7 - Programme is not published
+        .then(() => {
+            if(!programmeDoc.published){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Cannot edit a published programme"));
+            }
+        })
+        // ACT1 - Mark module as core for this programme
+        .then(() => {
+            return programmeRef.update("core", FieldValue.arrayUnion(module));
+        })
+        .then(result => {
+            return programmeRef.get();
+        })
+        .then(snapshot => {
+            res.send(snapshot.data());
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
     });
 });
 
 exports.setOptional = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
-        res.send("Not yet implemented");
+        // Setup variables
+        const idToken = req.body.idToken;
+        const programme = req.body.programme;
+        const module = req.body.module;
+        var uid;
+        var programmeDoc;
+        var programmeRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("programmes").doc(programme).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                programmeDoc = snapshot.data();
+                programmeRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Module exists
+        .then(() => {
+            return firestore.collection("modules").doc(module).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Module not found"));
+            }
+        })
+        // GRD4 - Requesting user is an administrator
+        .then(() => {
+            if(programmeDoc.administrators.includes(uid)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only a programme administrator can perform this action"));
+            }
+        })
+        // GRD5 - Module is a member of programme
+        .then(() => {
+            if(programmeDoc.modules.includes(module)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("This module is not a member of this programme"));
+            }
+        })
+        // GRD6 - Module is core
+        .then(() => {
+            if(programmeDoc.core.includes(module)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("This module is not core for this programme"));
+            }
+        })
+        // GRD7 - Programme is not published
+        .then(() => {
+            if(!programmeDoc.published){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Cannot edit a published programme"));
+            }
+        })
+        // ACT1 - Mark module as core for this programme
+        .then(() => {
+            return programmeRef.update("core", FieldValue.arrayRemove(module));
+        })
+        .then(result => {
+            return programmeRef.get();
+        })
+        .then(snapshot => {
+            res.send(snapshot.data());
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
     });
 });
