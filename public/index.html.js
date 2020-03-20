@@ -117,8 +117,8 @@ const Programme = {
         return {
             programme: null,
             leader: null,
-            modules: null,
-            administrators: null,
+            modules: [],
+            administrators: [],
             ready: false
         }
     },
@@ -133,14 +133,26 @@ const Programme = {
         .then(response => {
             this.leader = response.data;
             var promises = [];
-            for (admin in this.programme.administrators){
-                promises.push(axios.post(apiRoot+"/getUser"),{uid: admin})
-            }
+            this.programme.administrators.forEach(admin => {
+                promises.push(axios.post(apiRoot+"/getUser",{uid: admin}));
+            })
             return Promise.all(promises);
         })
         .then(responses => {
-            this.administrators = [];
-            responses.forEach()
+            responses.forEach(response => {
+                this.administrators.push(response.data);
+            })
+            var promises = [];
+            this.programme.modules.forEach(module => {
+                promises.push(firebase.firestore().collection("modules").doc(module).get());
+            })
+            return Promise.all(promises);
+        })
+        .then(snapshots => {
+            snapshots.forEach(snapshot => {
+                this.modules.push(snapshot.data())
+            })
+            this.ready = true;
         })
     },
     template:
@@ -158,6 +170,47 @@ const Programme = {
                 </div>
             </div>
         </section>
+        <br>
+        <div class="tile is-ancestor">
+            <div class="tile is-parent">
+                <div class="tile is-child is-success notification">
+                    <h1 class="title">
+                        Administrators
+                    </h1>
+                    <div class="content is-medium">
+                        <ul>
+                            <li v-for="a in administrators">
+                                {{ a.displayName }}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="tile is-child is-warning notification">
+                    <h1 class="title">
+                        Outcomes
+                    </h1>
+                    <div class="content is-medium">
+                        <ul>
+                            <li v-for="o in programme.outcomes">
+                                {{ o }}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="tile is-child is-danger notification">
+                <h1 class="title">
+                    Modules
+                </h1>
+                <div class="content is-medium">
+                    <ul>
+                        <li v-for="m in modules">
+                            {{ m.name }}
+                        </li>
+                    </ul>
+                </div>
+                </div>
+            </div>
+        </div>
     </div>
     `
 }
