@@ -2257,6 +2257,8 @@ exports.setOptional = functions.https.onRequest((req, res) => {
     });
 });
 
+// Functions which affect system state but are not within the scope of the formal model
+
 // Helper functions, will not affect system state
 exports.getUser = functions.https.onRequest((req, res) => {
     cors(req, res, () => {

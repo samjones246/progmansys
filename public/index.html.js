@@ -74,7 +74,9 @@ const ModuleList = {
             firebase.firestore().collection("modules").get()
             .then(snapshot => {
                 snapshot.docs.forEach(doc => {
-                    this.modules.push(doc.data());
+                    var data = doc.data();
+                    data.id=doc.id;
+                    this.modules.push(data);
                 })
                 return;
             })
@@ -106,7 +108,7 @@ const ModuleList = {
             <br>
             <p class="title">{{ m.name }}</p>
             <p class="subtitle">
-                <a>Edit</a> - <a>View</a>
+                <a>Edit</a> - <router-link v-bind:to="'/modules/'+m.id">View</router-link>
             </p>
         </section>
     </div>
@@ -119,13 +121,18 @@ const Programme = {
             leader: null,
             modules: [],
             administrators: [],
-            ready: false
+            ready: false,
+            years: []
         }
     },
     created: function() {
         firebase.firestore().collection("programmes").doc(this.$route.params.id).get()
         .then(snapshot => {
             this.programme = snapshot.data();
+            for(i=1;i<=this.programme.duration;i++){
+                this.years.push(i);
+                this.modules.push([[],[]])
+            }
             return axios.post(apiRoot+"/getUser",{
                 uid: this.programme.leader
             })
@@ -149,16 +156,20 @@ const Programme = {
             return Promise.all(promises);
         })
         .then(snapshots => {
-            snapshots.forEach(snapshot => {
-                this.modules.push(snapshot.data())
-            })
+            for(i=0;i<snapshots.length;i++){
+                var moduleDoc = snapshots[i].data();
+                var year = moduleDoc.year - 1;
+                var semester = moduleDoc.semester - 1;
+                moduleDoc.id = this.programme.modules[i];
+                this.modules[year][semester].push(moduleDoc)
+            }
             this.ready = true;
         })
     },
     template:
     `
     <div v-if="ready">
-        <section class="hero is-primary">
+        <section class="hero is-info">
             <div class="hero-body">
                 <div class="container">
                     <h1 class="title">
@@ -172,42 +183,69 @@ const Programme = {
         </section>
         <br>
         <div class="tile is-ancestor">
-            <div class="tile is-parent">
-                <div class="tile is-child is-success notification">
-                    <h1 class="title">
-                        Administrators
-                    </h1>
-                    <div class="content is-medium">
-                        <ul>
-                            <li v-for="a in administrators">
-                                {{ a.displayName }}
-                            </li>
-                        </ul>
+            <div class="tile is-parent is-vertical">
+                <div class="tile is-parent">
+                    <div class="tile is-parent">
+                        <div class="tile is-child is-success notification">
+                            <h1 class="title">
+                                Administrators
+                            </h1>
+                            <div class="content is-medium">
+                                <ul>
+                                    <li v-for="a in administrators">
+                                        {{ a.displayName }}
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tile is-parent">
+                        <div class="tile is-child is-warning notification">
+                            <h1 class="title">
+                                Outcomes
+                            </h1>
+                            <div class="content is-medium">
+                                <ul>
+                                    <li v-for="o in programme.outcomes">
+                                        {{ o }}
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="tile is-child is-warning notification">
-                    <h1 class="title">
-                        Outcomes
-                    </h1>
-                    <div class="content is-medium">
-                        <ul>
-                            <li v-for="o in programme.outcomes">
-                                {{ o }}
-                            </li>
-                        </ul>
+                <div class="tile is-parent">
+                    <div class="tile is-child is-danger notification">
+                        <h1 class="title is-3">
+                            Modules
+                        </h1>
+                        <div class="content is-medium">
+                            <ul>
+                                <li v-for="y in years">
+                                    <h2 class="title is-4">Year {{ y }}</h2>
+                                    <ul>
+                                        <li>
+                                            <h3 class="title is-4">Semester 1</h3>
+                                            <ul>
+                                                <li v-for="m in modules[y-1][0]">
+                                                    <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                        <br>
+                                        <li>
+                                            <h3 class="title is-4">Semester 2</h3>
+                                            <ul>
+                                                <li v-for="m in modules[y-1][1]">
+                                                    <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
-                </div>
-                <div class="tile is-child is-danger notification">
-                <h1 class="title">
-                    Modules
-                </h1>
-                <div class="content is-medium">
-                    <ul>
-                        <li v-for="m in modules">
-                            {{ m.name }}
-                        </li>
-                    </ul>
-                </div>
                 </div>
             </div>
         </div>
@@ -215,13 +253,111 @@ const Programme = {
     `
 }
 const Module = {
-
+    data: function(){
+        return {
+            module: null,
+            leader: null,
+            prerequisites: [],
+            ready: false
+        }
+    },
+    methods: {
+        update: function () {
+            this.module = null;
+            this.leader = null;
+            this.prerequisites = [];
+            this.ready = false;
+            firebase.firestore().collection("modules").doc(this.$route.params.id).get()
+            .then(snapshot => {
+                this.module = snapshot.data();
+                console.log(snapshot.data())
+                return axios.post(apiRoot+"/getUser",{
+                    uid: this.module.leader
+                })
+            })
+            .then(response => {
+                this.leader = response.data;
+                var promises = [];
+                this.module.prerequisites.forEach(module => {
+                    promises.push(firebase.firestore().collection("modules").doc(module).get());
+                })
+                return Promise.all(promises);
+            })
+            .then(snapshots => {
+                for(i=0;i<snapshots.length;i++){
+                    var moduleDoc = snapshots[i].data();
+                    moduleDoc.id = this.module.prerequisites[i];
+                    this.prerequisites.push(moduleDoc)
+                }
+                this.ready = true;
+            })
+        }
+    },
+    created: function(){
+        this.update();
+    },
+    watch: {
+        '$route': function () {
+            this.update();
+        }
+    },
+    template:
+    `
+    <div v-if="ready">
+        <section class="hero is-info">
+            <div class="hero-body">
+                <div class="container">
+                    <h1 class="title">
+                        {{ module.name }}
+                    </h1>
+                    <h2 class="subtitle">
+                        Led by {{ leader.displayName }}
+                    </h2>
+                </div>
+            </div>
+        </section>
+        <br>
+        <div class="tile is-ancestor">
+            <div class="tile is-parent">
+                <div class="tile is-parent">
+                    <div class="tile is-child is-warning notification">
+                        <h1 class="title">
+                            Outcomes
+                        </h1>
+                        <div class="content is-medium">
+                            <ul>
+                                <li v-for="o in module.outcomes">
+                                    {{ o }}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="tile is-parent">
+                    <div class="tile is-child is-danger notification">
+                        <h1 class="title is-3">
+                            Prerequisites
+                        </h1>
+                        <div class="content is-medium">
+                            <ul>
+                                <li v-for="m in prerequisites">
+                                    <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `
 }
 
 const routes = [
     { path: '/programmes', component: ProgrammeList },
     { path: '/modules', component: ModuleList },
     { path: '/programmes/:id', component: Programme },
+    { path: '/modules/:id', component: Module }
 ]
 const router = new VueRouter({
     routes
