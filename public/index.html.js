@@ -119,19 +119,54 @@ const Programme = {
         return {
             programme: null,
             leader: null,
-            modules: [],
+            core: [],
+            optional: [],
             administrators: [],
             ready: false,
-            years: []
+            years: [],
+            user: null
         }
     },
+    methods: {
+        toggleCore: function(module) {
+            var endpoint = apiRoot + (module.core ? "/setOptional" : "/setCore")
+            this.user.getIdToken()
+            .then(idToken => {
+                return axios.post(endpoint, {
+                    idToken: idToken,
+                    programme: this.$route.params.id,
+                    module: module.id
+                });
+            })
+            .then(response => {
+                var fromList = module.core ? this.core : this.optional;
+                fromList = fromList[module.year - 1][module.semester - 1]
+                var toList = module.core ? this.optional : this.core;
+                toList = toList[module.year - 1][module.semester - 1]
+
+                for(i=0;i<fromList.length;i++){
+                    var target = fromList[i]
+                    if(target.id === module.id){
+                        toList.push(target);
+                        fromList.splice(i, 1)
+                        module.core = !module.core;
+                        break;
+                    }
+                }
+            });
+        },
+    },
     created: function() {
+        firebase.auth().onAuthStateChanged(user => {
+            this.user = user;
+        })
         firebase.firestore().collection("programmes").doc(this.$route.params.id).get()
         .then(snapshot => {
             this.programme = snapshot.data();
             for(i=1;i<=this.programme.duration;i++){
                 this.years.push(i);
-                this.modules.push([[],[]])
+                this.core.push([[],[]]);
+                this.optional.push([[],[]]);
             }
             return axios.post(apiRoot+"/getUser",{
                 uid: this.programme.leader
@@ -161,7 +196,13 @@ const Programme = {
                 var year = moduleDoc.year - 1;
                 var semester = moduleDoc.semester - 1;
                 moduleDoc.id = this.programme.modules[i];
-                this.modules[year][semester].push(moduleDoc)
+                if(this.programme.core.includes(moduleDoc.id)){
+                    moduleDoc.core = true;
+                    this.core[year][semester].push(moduleDoc)
+                }else{
+                    moduleDoc.core = false;
+                    this.optional[year][semester].push(moduleDoc)
+                }
             }
             this.ready = true;
         })
@@ -224,22 +265,24 @@ const Programme = {
                                 <li v-for="y in years">
                                     <h2 class="title is-4">Year {{ y }}</h2>
                                     <ul>
-                                        <li>
-                                            <h3 class="title is-4">Semester 1</h3>
+                                        <li v-for="s in [1,2]">
+                                            <h3 class="title is-4">Semester {{ s }} </h3>
                                             <ul>
-                                                <li v-for="m in modules[y-1][0]">
-                                                    <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link>
+                                                <li v-for="type in ['Core', 'Optional']">
+                                                    <h3 class="title is-4">{{ type }}</h3>
+                                                    <ul>
+                                                        <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]">
+                                                            <h3 class="title is-4">{{ m.name }}</h3>
+                                                            <div class="subtitle is-6">
+                                                                <router-link v-bind:to="'/modules/'+m.id"><i class="fas fa-edit"></i></router-link> -  
+                                                                <a><i class="fas fa-trash-alt"></i></a> - 
+                                                                <a v-on:click="toggleCore(m)">Mark as {{ type==='Core' ? 'optional' : 'core' }}</a>
+                                                            </div>
+                                                        </li>
+                                                    </ul>
                                                 </li>
                                             </ul>
-                                        </li>
-                                        <br>
-                                        <li>
-                                            <h3 class="title is-4">Semester 2</h3>
-                                            <ul>
-                                                <li v-for="m in modules[y-1][1]">
-                                                    <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link>
-                                                </li>
-                                            </ul>
+                                            <br v-if="s==1">
                                         </li>
                                     </ul>
                                 </li>
