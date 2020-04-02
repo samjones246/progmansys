@@ -122,89 +122,172 @@ const Programme = {
             core: [],
             optional: [],
             administrators: [],
-            ready: false,
+            ready: true,
             years: [],
-            user: null
+            user: null,
+            pendingDelete: null,
+            showAddModule: false,
+            candidateModules: []
+        }
+    },
+    computed: {
+        userIsLeader: function(){
+            return this.user && this.programme.leader === this.user.uid;
+        },
+        userIsAdmin: function(){
+            return this.user && this.programme.administrators.includes(this.user.uid);
         }
     },
     methods: {
         toggleCore: function(module) {
-            var endpoint = apiRoot + (module.core ? "/setOptional" : "/setCore")
-            this.user.getIdToken()
-            .then(idToken => {
-                return axios.post(endpoint, {
-                    idToken: idToken,
-                    programme: this.$route.params.id,
-                    module: module.id
-                });
+            var endpoint = module.core ? "setOptional" : "setCore";
+            this.sendRequest(endpoint, {
+                programme: this.$route.params.id,
+                module: module.id
             })
             .then(response => {
-                var fromList = module.core ? this.core : this.optional;
-                fromList = fromList[module.year - 1][module.semester - 1]
-                var toList = module.core ? this.optional : this.core;
-                toList = toList[module.year - 1][module.semester - 1]
-
-                for(i=0;i<fromList.length;i++){
-                    var target = fromList[i]
-                    if(target.id === module.id){
-                        toList.push(target);
-                        fromList.splice(i, 1)
-                        module.core = !module.core;
-                        break;
+                this.getProgramme()
+               .then(() => {
+                   this.getModules();
+               })
+            })
+            .catch(error => {
+                alert(error);
+            })
+        },
+        unassignModule: function(module){
+            this.pendingDelete = null;
+            this.sendRequest("unassignModule", {
+                programme: this.$route.params.id,
+                module: module.id
+            })
+            .then(response => {
+                this.getProgramme()
+               .then(() => {
+                   this.getModules();
+               })
+            })
+            .catch(error => {
+                alert(error);
+            })
+        },
+        assignModule: function(module){
+            this.showAddModule = false;
+            this.sendRequest("assignModule", {
+                programme: this.$route.params.id,
+                module: module.id
+            })
+            .then(response => {
+                this.getProgramme()
+               .then(() => {
+                   this.getModules();
+               })
+            })
+            .catch(error => {
+                alert(error);
+            })
+        },
+        getCandidateModules: function(){
+            this.candidateModules = [];
+            for(i=0;i<this.programme.duration;i++){
+                this.candidateModules.push([[],[]]);
+            }
+            firebase.firestore().collection("modules").where("year", "<=", this.programme.duration).get()
+            .then(snapshot => {
+                snapshot.docs.forEach(document => {
+                    var data = document.data();
+                    data.id = document.id;
+                    if(!this.programme.modules.includes(data.id)){
+                        this.candidateModules[data.year-1][data.semester-1].push(data);
                     }
-                }
+                })
+                this.showAddModule=true;
+            })
+        },
+        getProgramme: function() {
+            return firebase.firestore().collection("programmes").doc(this.$route.params.id).get()
+            .then(snapshot => {
+                this.programme = snapshot.data();
+            })
+        },
+        getLeader: function() {
+            axios.post(apiRoot+"/getUser",{
+                uid: this.programme.leader
+            })
+            .then(response => {
+                this.leader = response.data;
             });
         },
+        getAdministrators: function() {
+            this.administrators=[];
+            var promises = [];
+            this.programme.administrators.forEach(admin => {
+                promises.push(axios.post(apiRoot+"/getUser",{uid: admin}));
+            })
+            Promise.all(promises)
+            .then(responses => {
+                responses.forEach(response => {
+                    this.administrators.push(response.data);
+                })
+            });
+        },
+        getOutcomes: function() {
+
+        },
+        getModules: function() {
+            var years=[];
+            var core=[];
+            var optional=[];
+            for(i=1;i<=this.programme.duration;i++){
+                years.push(i);
+                core.push([[],[]]);
+                optional.push([[],[]]);
+            }
+            var promises = [];
+            this.programme.modules.forEach(module => {
+                promises.push(firebase.firestore().collection("modules").doc(module).get());
+            })
+            Promise.all(promises)
+            .then(snapshots => {
+                for(i=0;i<snapshots.length;i++){
+                    var moduleDoc = snapshots[i].data();
+                    var year = moduleDoc.year - 1;
+                    var semester = moduleDoc.semester - 1;
+                    moduleDoc.id = this.programme.modules[i];
+                    if(this.programme.core.includes(moduleDoc.id)){
+                        moduleDoc.core = true;
+                        core[year][semester].push(moduleDoc)
+                    }else{
+                        moduleDoc.core = false;
+                        optional[year][semester].push(moduleDoc)
+                    }
+                }
+                this.years=years;
+                this.core=core;
+                this.optional=optional;
+            });
+        },
+        sendRequest: function(endpoint, data, needsAuth=true){
+            if(needsAuth && !this.user){
+                return;
+            }
+            return this.user.getIdToken()
+            .then(idToken => {
+                data.idToken = idToken;
+                return axios.post(apiRoot + "/" + endpoint, data);
+            })
+        }
     },
     created: function() {
         firebase.auth().onAuthStateChanged(user => {
             this.user = user;
         })
-        firebase.firestore().collection("programmes").doc(this.$route.params.id).get()
-        .then(snapshot => {
-            this.programme = snapshot.data();
-            for(i=1;i<=this.programme.duration;i++){
-                this.years.push(i);
-                this.core.push([[],[]]);
-                this.optional.push([[],[]]);
-            }
-            return axios.post(apiRoot+"/getUser",{
-                uid: this.programme.leader
-            })
-        })
-        .then(response => {
-            this.leader = response.data;
-            var promises = [];
-            this.programme.administrators.forEach(admin => {
-                promises.push(axios.post(apiRoot+"/getUser",{uid: admin}));
-            })
-            return Promise.all(promises);
-        })
-        .then(responses => {
-            responses.forEach(response => {
-                this.administrators.push(response.data);
-            })
-            var promises = [];
-            this.programme.modules.forEach(module => {
-                promises.push(firebase.firestore().collection("modules").doc(module).get());
-            })
-            return Promise.all(promises);
-        })
-        .then(snapshots => {
-            for(i=0;i<snapshots.length;i++){
-                var moduleDoc = snapshots[i].data();
-                var year = moduleDoc.year - 1;
-                var semester = moduleDoc.semester - 1;
-                moduleDoc.id = this.programme.modules[i];
-                if(this.programme.core.includes(moduleDoc.id)){
-                    moduleDoc.core = true;
-                    this.core[year][semester].push(moduleDoc)
-                }else{
-                    moduleDoc.core = false;
-                    this.optional[year][semester].push(moduleDoc)
-                }
-            }
-            this.ready = true;
+        this.getProgramme()
+        .then(() => {
+            this.getLeader();
+            this.getAdministrators();
+            this.getOutcomes();
+            this.getModules();
         })
     },
     template:
@@ -214,10 +297,10 @@ const Programme = {
             <div class="hero-body">
                 <div class="container">
                     <h1 class="title">
-                        {{ programme.name }}
+                        {{ programme.name }} <a v-if="userIsLeader"><i class="fas fa-edit"></i></a>
                     </h1>
                     <h2 class="subtitle">
-                        Led by {{ leader.displayName }}
+                        Led by {{ leader.displayName }} <a v-if="userIsLeader"><i class="fas fa-edit"></i></a>
                     </h2>
                 </div>
             </div>
@@ -229,12 +312,12 @@ const Programme = {
                     <div class="tile is-parent">
                         <div class="tile is-child is-success notification">
                             <h1 class="title">
-                                Administrators
+                                Administrators <a v-if="userIsLeader"><i class="fas fa-plus-circle"></i></a>
                             </h1>
                             <div class="content is-medium">
                                 <ul>
                                     <li v-for="a in administrators">
-                                        {{ a.displayName }}
+                                        {{ a.displayName }} <a v-if="userIsLeader"><i class="fas fa-minus-circle"></i></a>
                                     </li>
                                 </ul>
                             </div>
@@ -243,12 +326,12 @@ const Programme = {
                     <div class="tile is-parent">
                         <div class="tile is-child is-warning notification">
                             <h1 class="title">
-                                Outcomes
+                                Outcomes <a v-if="userIsAdmin"><i class="fas fa-plus-circle"></i></a>
                             </h1>
                             <div class="content is-medium">
                                 <ul>
                                     <li v-for="o in programme.outcomes">
-                                        {{ o }}
+                                        {{ o }} <a v-if="userIsAdmin"><i class="fas fa-minus-circle"></i></a>
                                     </li>
                                 </ul>
                             </div>
@@ -258,7 +341,7 @@ const Programme = {
                 <div class="tile is-parent">
                     <div class="tile is-child is-danger notification">
                         <h1 class="title is-3">
-                            Modules
+                            Modules <a v-if="userIsAdmin" v-on:click="getCandidateModules()"><i class="fas fa-plus-circle"></i></a>
                         </h1>
                         <div class="content is-medium">
                             <ul>
@@ -268,14 +351,14 @@ const Programme = {
                                         <li v-for="s in [1,2]">
                                             <h3 class="title is-4">Semester {{ s }} </h3>
                                             <ul>
-                                                <li v-for="type in ['Core', 'Optional']">
+                                                <li v-for="type in ['Core', 'Optional']" v-if="(type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]).length > 0">
                                                     <h3 class="title is-4">{{ type }}</h3>
-                                                    <ul>
+                                                    <ul>    
                                                         <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]">
                                                             <h3 class="title is-4">{{ m.name }}</h3>
-                                                            <div class="subtitle is-6">
+                                                            <div class="subtitle is-6" v-if="userIsAdmin">
                                                                 <router-link v-bind:to="'/modules/'+m.id"><i class="fas fa-edit"></i></router-link> -  
-                                                                <a><i class="fas fa-trash-alt"></i></a> - 
+                                                                <a v-on:click="pendingDelete = m"><i class="fas fa-minus-circle"></i></a> - 
                                                                 <a v-on:click="toggleCore(m)">Mark as {{ type==='Core' ? 'optional' : 'core' }}</a>
                                                             </div>
                                                         </li>
@@ -290,6 +373,53 @@ const Programme = {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+        <div class="modal" v-bind:class="{'is-active': pendingDelete}">
+            <div class="modal-background"></div>
+            <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Confirm decision</p>
+                <button class="delete" aria-label="close" v-on:click='pendingDelete=null'></button>
+            </header>
+            <section class="modal-card-body">
+                <p>Are you sure you wish to unassign from this programme?</p>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-danger" v-on:click='unassignModule(pendingDelete)'>Unassign Module</button>
+                <button class="button" v-on:click='pendingDelete=null'>Cancel</button>
+            </footer>
+            </div>
+        </div>
+        <div class="modal" v-bind:class="{'is-active': showAddModule}">
+            <div class="modal-background"></div>
+            <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Assign Module</p>
+                <button class="delete" aria-label="close" v-on:click='showAddModule=false'></button>
+            </header>
+            <section class="modal-card-body">
+                <div class="content">
+                <ul>
+                <li v-for="(year, i) in candidateModules">
+                    <h1 class="title is-4">Year {{ i+1 }}</h1>
+                    <ul>
+                        <li v-for="(semester, j) in year">
+                            <h1 class="title is-4">Semester {{ j+1 }}</h1>
+                            <ul>
+                                <li v-for="(module, k) in semester">
+                                    <h1 class="title is-4">{{ module.name }} <a v-on:click="assignModule(module)"><i class="fas fa-plus-circle"></i></a></h1>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                </ul>
+                </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button" v-on:click='showAddModule=false'>Cancel</button>
+            </footer>
             </div>
         </div>
     </div>

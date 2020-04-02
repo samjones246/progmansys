@@ -157,7 +157,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
         var programmeDoc;
         var moduleDoc;
         // Check module exists
-        firestore.collection('modules').doc(moduleId).get()
+        firestore.collection('modules').doc(module).get()
         .then(snapshot => {
             if(!snapshot.exists){
                 return Promise.reject(Error("Module not found"));
@@ -168,7 +168,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
         })
         // Check programme exists
         .then(() => {
-            return firestore.collection('programmes').doc(programmeId).get();
+            return firestore.collection('programmes').doc(programme).get();
         })
         .then(snapshot => {
             if(!snapshot.exists){
@@ -192,7 +192,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
         })
         // Check this module is not already assigned to this programme
         .then(() => {
-            if(programmeDoc.modules.includes(moduleId)){
+            if(programmeDoc.modules.includes(module)){
                 return Promise.reject(Error("Module already assigned to this programme"));
             }else{
                 return Promise.resolve();
@@ -216,8 +216,8 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
         })
         // Assign module
         .then(() => {
-            programmeDoc.modules.push(moduleId);
-            return firestore.collection('programmes').doc(programmeId).update({
+            programmeDoc.modules.push(module);
+            return firestore.collection('programmes').doc(programme).update({
                 modules: programmeDoc.modules
             });
         })
@@ -242,7 +242,7 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
         var moduleRef;
         var moduleDoc;
         // Check module exists
-        firestore.collection('modules').doc(moduleId).get()
+        firestore.collection('modules').doc(module).get()
         .then(snapshot => {
             if(!snapshot.exists){
                 return Promise.reject(Error("Module not found"));
@@ -267,7 +267,7 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
         })
         // Check module is not part of any programmes
         .then(() => {
-            return firestore.collection("programmes").where("modules", "array-contains", moduleId).get();
+            return firestore.collection("programmes").where("modules", "array-contains", module).get();
         })
         .then(snapshot => {
             if(snapshot.empty){
@@ -299,7 +299,7 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
         var programmeRef;
         var programmeDoc;
         // Check programme exists
-        firestore.collection('programmes').doc(programmeId).get()
+        firestore.collection('programmes').doc(programme).get()
         .then(snapshot => {
             if(!snapshot.exists){
                 return Promise.reject(Error("programme not found"));
@@ -347,14 +347,14 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
 exports.unassignModule = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
         // Setup variables
-        const programmeId = req.body.programmeId;
-        const moduleId = req.body.moduleId;
+        const programme = req.body.programme;
+        const module = req.body.module;
         const idToken = req.body.idToken;
         var uid;
         var programmeDoc;
         var moduleDoc;
         // Check module exists
-        firestore.collection('modules').doc(moduleId).get()
+        firestore.collection('modules').doc(module).get()
         .then(snapshot => {
             if(!snapshot.exists){
                 return Promise.reject(Error("Module not found"));
@@ -365,7 +365,7 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
         })
         // Check programme exists
         .then(() => {
-            return firestore.collection('programmes').doc(programmeId).get();
+            return firestore.collection('programmes').doc(programme).get();
         })
         .then(snapshot => {
             if(!snapshot.exists){
@@ -389,7 +389,7 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
         })
         // Check this module is assigned to this programme
         .then(() => {
-            if(!programmeDoc.modules.includes(moduleId)){
+            if(!programmeDoc.modules.includes(module)){
                 return Promise.reject(Error("Module not assigned to this programme"));
             }else{
                 return Promise.resolve();
@@ -405,8 +405,9 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
         })
         // ACT1 - Unassign module
         .then(() => {
-            return firestore.collection('programmes').doc(programmeId).update({
-                modules: programmeDoc.modules.filter((value, index, arr) => value!= moduleId)
+            return firestore.collection('programmes').doc(programme).update({
+                modules: programmeDoc.modules.filter((value, index, arr) => value!= module),
+                core: programmeDoc.core.filter((value, index, arr) => value!= module)
             });
         })
         .then(result => {
