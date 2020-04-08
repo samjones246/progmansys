@@ -405,9 +405,13 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
         })
         // ACT1 - Unassign module
         .then(() => {
+            for(i in programmeDoc.mapping){
+                delete programmeDoc.mapping[i][module]
+            }
             return firestore.collection('programmes').doc(programme).update({
                 modules: programmeDoc.modules.filter((value, index, arr) => value!= module),
-                core: programmeDoc.core.filter((value, index, arr) => value!= module)
+                core: programmeDoc.core.filter((value, index, arr) => value!= module),
+                mapping: programmeDoc.mapping
             });
         })
         .then(result => {
@@ -1173,7 +1177,10 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
         })
         // ACT1 - Map Outcome
         .then(() => {
-            programmeDoc.mapping[programmeOutcome][module].push(moduleOutcome);
+            if(!programmeDoc.mapping[programmeOutcome][module]){
+                programmeDoc.mapping[programmeOutcome][module] = [];
+            }
+            programmeDoc.mapping[programmeOutcome][module].push(moduleOutcome)
             return programmeRef.update({
                 mapping: programmeDoc.mapping
             })
@@ -2259,6 +2266,64 @@ exports.setOptional = functions.https.onRequest((req, res) => {
 });
 
 // Functions which affect system state but are not within the scope of the formal model
+exports.renameProgramme = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const programme = req.body.programme;
+        const name = req.body.name;
+        var uid;
+        var programmeDoc;
+        var programmeRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("programmes").doc(programme).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                programmeDoc = snapshot.data();
+                programmeRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Requesting user is programme leader
+        .then(() => {
+            if(programmeDoc.leader === uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the programme leader can perform this action"));
+            }
+        })
+        // ACT1 - Rename programme
+        .then(() => {
+            return programmeRef.update("name", name);
+        })
+        .then(result => {
+            return programmeRef.get();
+        })
+        .then(snapshot => {
+            res.send(snapshot.data());
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
+    });
+});
+
+exports.renameModule = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+    });
+});
 
 // Helper functions, will not affect system state
 exports.getUser = functions.https.onRequest((req, res) => {
@@ -2274,4 +2339,18 @@ exports.getUser = functions.https.onRequest((req, res) => {
             return;
         })
     })
+});
+exports.getUserByEmail = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        const email = req.body.email;
+        admin.auth().getUserByEmail(email)
+        .then(userRecord => {
+            res.send(userRecord)
+            return;
+        })
+        .catch(error => {
+            res.status(400).send("User not found");
+            return;
+        })
+    });
 });

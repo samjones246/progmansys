@@ -52,10 +52,10 @@
                 Create
               </a>
               <div class="navbar-dropdown">
-                <a class="navbar-item" v-on:click="showCreateProgramme=true">
+                <a class="navbar-item" v-on:click="$refs.createProgramme.show()">
                   Programme
                 </a>
-                <a class="navbar-item" v-on:click="showCreateModule=true">
+                <a class="navbar-item" v-on:click="$refs.createModule.show()">
                   Module
                 </a>
               </div>
@@ -82,98 +82,8 @@
       </nav>
       <router-view></router-view>
       <div id="firebaseui-auth-container"></div>
-      <div id="create-programme" class="modal" v-bind:class="{'is-active': showCreateProgramme}">
-        <div class="modal-background"></div>
-        <div class="modal-card">
-          <header class="modal-card-head">
-            <p class="modal-card-title">Create Programme</p>
-            <button class="delete" aria-label="close" v-on:click="showCreateProgramme=false"></button>
-          </header>
-          <section class="modal-card-body">
-            <div class="field">
-              <label class="label">Name: </label>
-              <div class="control">
-                <input class="input" type="text" placeholder="BSc Something">
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Duration: </label>
-              <div class="control">
-                <div class="select">
-                  <select>
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
-                    <option>4</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </section>
-          <footer class="modal-card-foot">
-            <button class="button is-success" v-on:click="showCreateProgramme=false">Create</button>
-            <button class="button" v-on:click="showCreateProgramme=false">Cancel</button>
-          </footer>
-        </div>
-      </div>
-      <div id="create-module" class="modal" v-bind:class="{'is-active': showCreateModule}">
-        <div class="modal-background"></div>
-        <div class="modal-card">
-          <header class="modal-card-head">
-            <p class="modal-card-title">Create Module</p>
-            <button class="delete" aria-label="close" v-on:click="showCreateModule=false"></button>
-          </header>
-          <section class="modal-card-body">
-            <div class="field">
-              <label class="label">Name: </label>
-              <div class="control">
-                <input class="input" type="text" placeholder="EXMP1001 Example">
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Year: </label>
-              <div class="control">
-                <div class="select">
-                  <select>
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
-                    <option>4</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Semester: </label>
-              <div class="control">
-                <div class="select">
-                  <select>
-                    <option>1</option>
-                    <option>2</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Credits: </label>
-              <div class="control">
-                <div class="select">
-                  <select>
-                    <option>15</option>
-                    <option>30</option>
-                    <option>45</option>
-                    <option>60</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </section>
-          <footer class="modal-card-foot">
-            <button class="button is-success" v-on:click="showCreateModule=false">Create</button>
-            <button class="button" v-on:click="showCreateModule=false">Cancel</button>
-          </footer>
-        </div>
-      </div>
+      <create-programme ref="createProgramme"></create-programme>
+      <create-module ref="createModule"/>
     </div>
   <script type="text/javascript" src="functions.js"></script>
   <script src="index.html.js"></script>
