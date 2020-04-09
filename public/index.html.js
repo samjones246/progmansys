@@ -376,7 +376,234 @@ const AddAdministrator = {
     `
 }
 const ConfirmRemoveAdministrator = {
+    props: {
+        pending: Object
+    },
+    template: `
+    <div class="modal" v-bind:class="{'is-active': pending}">
+        <div class="modal-background"></div>
+            <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Confirm decision</p>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:pending', null)"></button>
+            </header>
+            <section class="modal-card-body">
+                <p>Are you sure you wish to unassign administrator {{ pending.displayName }} ({{pending.email}}) from this programme?</p>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-danger" v-on:click="$emit('submit')">Confirm</button>
+                <button class="button" v-on:click="$emit('update:pending', null)">Cancel</button>
+            </footer>
+        </div>
+    </div>
+    `
+}
+const TransferOwnership = {
+    data: function(){
+        return {
+            pending: ""
+        }
+    },
+    props: {
+        showing: Boolean,
+        administrators: Array
+    },
+    template: `
+    <div class="modal" v-bind:class="{'is-active': showing}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Transfer Programme Ownership</p>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
+            </header>
+            <section class="modal-card-body">
+            <div class="content is-medium">
+            <p class="title is-5">Eligible Administrators:</p>
+                <div v-for="admin in administrators">
+                    <label class="radio" v-on:click="pending=admin.uid">
+                        <input type="radio" name="answer">
+                        <strong>{{ admin.displayName }}</strong> ({{ admin.email }})
+                    </label>
+                </div>
+            </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-success" v-on:click="$emit('submit', pending)" v-bind:disabled="!pending">Confirm</button>
+                <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            </footer>
+        </div>
+    </div>
+    `
+}
+const ChangeDuration = {
+    data: function(){
+        return {
+            pending: null
+        }
+    },
+    props: {
+        showing: Boolean,
+        current: Number
+    },
+    template: `
+    <div class="modal" v-bind:class="{'is-active': showing}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Change Programme Duration</p>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
+            </header>
+            <section class="modal-card-body">
+                <div class="control">
+                    <label class="label">New Duration: </label>
+                    <div class="select">
+                        <select v-model="pending">
+                            <option v-for="i in [1,2,3,4].filter(i => i != current)">
+                                {{ i }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-success" v-on:click="$emit('submit', parseInt(pending))" v-bind:disabled="!pending">Confirm</button>
+                <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            </footer>
+        </div>
+    </div>
+    `
+}
+const ConfirmPublishProgramme = {
+    data: function() {
+        return {
+            problems: [],
+            asyncProcesses: [],
+            registered: false,
+            ready: false
+        }
+    },
+    props: {
+        showing: Boolean,
+        programme: Object,
+        core: Array,
+        optional: Array
+    },
+    methods: {
+        getProblems: function(){
+            this.problems = [];
+            this.asyncProcesses = [];
+            this.registered = false;
+            this.ready = false;
+            for(y=1;y<=this.programme.duration;y++){
+                for(s=1;s<=2;s++){
+                    var coreTotal = this.totalCredits(this.core[y-1][s-1]);
+                    var optionalTotal = this.totalCredits(this.optional[y-1][s-1]);
 
+                    if(coreTotal + optionalTotal < 60){
+                        this.problems.push("Insufficient credits available in <strong>Year "+y+", Semester "+s+"</strong>: "
+                                          +(coreTotal + optionalTotal)+" credits available, must be at least 60");
+                    }
+
+                    if(coreTotal > 60){
+                        this.problems.push("More than 60 credits awarded by core modules in <strong>Year "+y+", Semester "+s+"</strong>.")
+                    }
+
+                    for(module of this.optional[y-1][s-1]){
+                        if(module.credits + coreTotal > 60){
+                            this.problems.push("Module <strong>"+module.name+"</strong> in <strong>Year "+y+", Semester "+s+"</strong> awards "+module.credits+" credits, but only "+(60-coreTotal)+" credits are left to award after core modules.")
+                        }
+                        for(prereq of module.prerequisites){
+                            if(!this.programme.modules.includes(prereq)){
+                                pid = this.asyncProcesses.push(false) - 1;
+                                console.log(pid + " registered");
+                                firebase.firestore().collection("modules").doc(prereq).get().then(doc => {
+                                    this.problems.push("Module <strong>"+module.name+"</strong> in <strong>Year "+y+", Semester "+s+"</strong> has a prerequisite module which is not on the programme: <strong>"+doc.data().name+"</strong>")
+                                    this.complete(pid);
+                                })
+                            }
+                        }
+                    }
+                    for(module of this.core[y-1][s-1]){
+                        for(prereq of module.prerequisites){
+                            if(!this.programme.modules.includes(prereq)){
+                                let pid = this.asyncProcesses.push(false) - 1;
+                                console.log(pid + " registered");
+                                firebase.firestore().collection("modules").doc(prereq).get().then(doc => {
+                                    this.problems.push("Module <strong>"+module.name+"</strong> in <strong>Year "+y+", Semester "+s+"</strong> has a prerequisite module which is not on the programme: <strong>"+doc.data().name+"</strong>")
+                                    this.complete(pid);
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+            this.registered = true;
+            if(this.asyncProcesses.length === 0){
+                this.ready = true;
+            }
+        },
+        totalCredits: function(semester){
+            var total = 0;
+            for(module of semester){
+                total += module.credits;
+            }
+            return total;
+        },
+        complete: function(pid){
+            this.asyncProcesses[pid] = true;
+            console.log(pid+" finished");
+            if(this.registered){
+                for(p of this.asyncProcesses){
+                    if (!p){
+                        return;
+                    }
+                }
+                this.ready = true;
+            }
+        }
+    },
+    watch: {
+        'showing': function () {
+            if(this.showing == true){
+                this.getProblems();
+            }
+        }
+    },
+    template: `
+    <div class="modal" v-bind:class="{'is-active': showing}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Publish Programme</p>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
+            </header>
+            <section class="modal-card-body">
+            <div class="content is-medium">
+                <p class="title is-5">Problems:</p>
+                <div v-if="ready">
+                    <ul v-if="problems.length > 0">
+                        <li v-for="problem in problems">
+                            <span v-html="problem"></span>
+                        </li>
+                    </ul>
+                    <p v-else>No problems, ready to publish!</p>
+                </div>
+                <div v-else>
+                    <p>Processing, please wait...</p>
+                </div>
+            </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-success" v-on:click="$emit('submit')" v-bind:disabled="!(ready && problems.length === 0)">Confirm</button>
+                <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            </footer>
+        </div>
+    </div>
+    `
+}
+const ConfirmUnpublishProgramme = {
+}
+const ConfirmDeleteProgramme = {
 }
 
 const ProgrammeEditor = {
@@ -393,6 +620,7 @@ const ProgrammeEditor = {
             pendingDelete: null,
             pendingDeleteOutcome: null,
             pendingUnmap: null,
+            pendingRemoveAdmin: null,
             candidateModules: [],
             pendingProgrammeName: "",
             pendingOutcome: "",
@@ -404,6 +632,11 @@ const ProgrammeEditor = {
                 mapOutcome: false,
                 confirmUnassignModule: false,
                 addAdministrator: false,
+                transferOwnership: false,
+                changeDuration: false,
+                confirmPublishProgramme: false,
+                confirmUnpublishProgramme: false,
+                confirmDeleteProgramme: false
             }
         }
     },
@@ -431,6 +664,11 @@ const ProgrammeEditor = {
         'confirm-unmap-outcome': ConfirmUnmapOutcome,
         'add-administrator': AddAdministrator,
         'confirm-remove-administrator': ConfirmRemoveAdministrator,
+        'transfer-ownership': TransferOwnership,
+        'change-duration': ChangeDuration,
+        'confirm-publish-programme': ConfirmPublishProgramme,
+        'confirm-unpublish-programme': ConfirmUnpublishProgramme,
+        'confirm-delete-programme': ConfirmDeleteProgramme
     },
     methods: {
         toggleCore: function(module) {
@@ -673,6 +911,90 @@ const ProgrammeEditor = {
             } else {
                 alert('Error: ' + error.message);
             }
+        },
+        removeAdministrator: function(uid){
+            this.pendingRemoveAdmin = null;
+            this.sendRequest("removeAdministrator", {
+                programme: this.$route.params.id,
+                targetUid: uid
+            })
+            .then(response => {
+                this.getProgramme()
+                .then(() => {
+                    this.getAdministrators();
+                })
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
+        },
+        transferOwnership: function(uid){
+            this.modals.transferOwnership = false;
+            this.sendRequest("transferProgrammeOwnership", {
+                programme: this.$route.params.id,
+                targetUid: uid
+            })
+            .then(response => {
+                this.getProgramme()
+                .then(() => {
+                    this.getLeader();
+                })
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
+        },
+        changeDuration: function(duration){
+            this.modals.changeDuration = false;
+            this.sendRequest("changeDuration", {
+                programme: this.$route.params.id,
+                duration: duration
+            })
+            .then(response => {
+                this.getProgramme()
+                .then(() => {
+                    this.getModules();
+                })
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
+        },
+        publishProgramme: function(){
+            this.modals.confirmPublishProgramme = false;
+            this.sendRequest("publishProgramme", {
+                programme: this.$route.params.id
+            })
+            .then(response => {
+                this.getProgramme();
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
+        },
+        unpublishProgramme: function(){
+            this.modals.confirmUnpublishProgramme = false;
+            this.sendRequest("unpublishProgramme", {
+                programme: this.$route.params.id
+            })
+            .then(response => {
+                this.getProgramme();
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
+        },
+        deleteProgramme: function(){
+            this.modals.confirmDeleteProgramme = false;
+            this.sendRequest("deleteProgramme", {
+                programme: this.$route.params.id
+            })
+            .then(response => {
+                this.getProgramme();
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
         }
     },
     created: function() {
@@ -697,16 +1019,36 @@ const ProgrammeEditor = {
         <section class="hero is-info">
             <div class="hero-body">
                 <div class="container">
-                    <h1 class="title">
-                        {{ programme.name }} <a v-if="userIsLeader" v-on:click="modals.renameProgramme=true" title="Rename Programme"><i class="fas fa-edit"></i></a>
-                    </h1>
-                    <h2 class="subtitle">
-                        Led by {{ leader.displayName }} <a v-if="userIsLeader" title="Transfer ownership"><i class="fas fa-edit"></i></a>
-                    </h2>
+                    <nav class="level">
+                        <div class="level-left">
+                            <div>
+                                <h1 class="title">
+                                    {{ programme.name }} <a v-if="userIsLeader" v-on:click="modals.renameProgramme=true" title="Rename Programme"><i class="fas fa-edit"></i></a>
+                                </h1>
+                                <h2 class="subtitle">
+                                    Led by {{ leader.displayName }} <a v-if="userIsLeader" title="Transfer ownership" v-on:click="modals.transferOwnership=true"><i class="fas fa-edit"></i></a>
+                                </h2>
+                            </div>
+                        </div>
+                        <div class="level-right">
+                            <div>
+                                <h2 class="title is-5">
+                                    Programme Duration: {{ programme.duration }} {{ programme.duration==1 ? "year" : "years" }} <a v-on:click="modals.changeDuration=true"><i class="fas fa-edit"></i></a>
+                                </h2>
+                                <h2 class="title is-5">
+                                    <div v-if="programme.published">
+                                        Published (<a v-on:click="modals.confirmUnpublishProgramme = true">Unpublish</a>)
+                                    </div>
+                                    <div v-else>
+                                        Unpublished (<a v-on:click="modals.confirmPublishProgramme = true">Publish</a>)
+                                    </div>
+                                </h2>
+                            </div>
+                        </div>
+                    </nav>
                 </div>
             </div>
         </section>
-        <br>
         <div class="tile is-ancestor">
             <div class="tile is-parent is-vertical">
                 <div class="tile is-parent">
@@ -718,7 +1060,7 @@ const ProgrammeEditor = {
                             <div class="content is-medium">
                                 <ul>
                                     <li v-for="a in administrators">
-                                        {{ a.displayName }} <a v-if="userIsLeader"><i class="fas fa-minus-circle"></i></a>
+                                        {{ a.displayName }} <a v-if="userIsLeader" v-on:click="pendingRemoveAdmin=a"><i class="fas fa-minus-circle"></i></a>
                                     </li>
                                 </ul>
                             </div>
@@ -752,7 +1094,7 @@ const ProgrammeEditor = {
                         </div>
                     </div>
                 </div>
-                <div class="tile is-parent">
+                <div class="tile is-parent is-vertical">
                     <div class="tile is-child is-danger notification">
                         <h1 class="title is-3">
                             Modules <a v-if="userIsAdmin" v-on:click="getCandidateModules()"><i class="fas fa-plus-circle"></i></a>
@@ -786,6 +1128,7 @@ const ProgrammeEditor = {
                             </ul>
                         </div>
                     </div>
+                    <a v-on:click="modals.confirmDeleteProgramme = true">Delete Programme</a>
                 </div>
             </div>
         </div>
@@ -828,6 +1171,28 @@ const ProgrammeEditor = {
         <add-administrator
             v-bind:showing.sync="modals.addAdministrator"
             v-on:submit="addAdministrator($event)"
+        />
+        <confirm-remove-administrator
+            v-if="pendingRemoveAdmin"
+            v-bind:pending.sync="pendingRemoveAdmin"
+            v-on:submit="removeAdministrator(pendingRemoveAdmin.uid)"
+        />
+        <transfer-ownership
+            v-bind:showing.sync="modals.transferOwnership"
+            v-bind:administrators="administrators.filter(a => a.uid != leader.uid)"
+            v-on:submit="transferOwnership($event)"
+        />
+        <change-duration
+            v-bind:showing.sync="modals.changeDuration"
+            v-bind:current="programme.duration"
+            v-on:submit="changeDuration($event)"
+        />
+        <confirm-publish-programme
+            v-bind:showing.sync="modals.confirmPublishProgramme"
+            v-bind:programme="programme"
+            v-bind:core="core"
+            v-bind:optional="optional"
+            v-on:submit="publishProgramme()"
         />
     </div>
     `
