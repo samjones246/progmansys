@@ -126,7 +126,7 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
                 semester: semester,
                 year: year,
                 credits: credits,
-                outcomes: [],
+                outcomes: {},
                 prerequisites: []
             });
         })
@@ -1177,6 +1177,9 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
         })
         // ACT1 - Map Outcome
         .then(() => {
+            if(!programmeDoc.mapping[programmeOutcome]){
+                programmeDoc.mapping[programmeOutcome] = {};
+            }
             if(!programmeDoc.mapping[programmeOutcome][module]){
                 programmeDoc.mapping[programmeOutcome][module] = [];
             }
@@ -1191,6 +1194,7 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            console.log(error)
         });
     });
 });
@@ -1902,7 +1906,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
         .then(() => {
             var promises = [];
             for (i=0;i<programmeDoc.modules.length;i++){
-                promises[i] = firestore.collection("modules").doc(programmesDoc.modules[i]).get();
+                promises[i] = firestore.collection("modules").doc(programmeDoc.modules[i]).get();
             }
             return Promise.all(promises);
         })
@@ -1911,7 +1915,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
             modules = snapshots;
             snapshots.forEach(_module => {
                 var module = _module.data();
-                if(!module.prerequisites.every(p => programmesDoc.modules.includes(p))){
+                if(!module.prerequisites.every(p => programmeDoc.modules.includes(p))){
                     reject.push(module.name);
                 }
             });
@@ -1925,7 +1929,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
         .then(() => {
             var promises = [];
             for (i=0;i<programmeDoc.core.length;i++){
-                promises[i] = firestore.collection("modules").doc(programmesDoc.core[i]).get();
+                promises[i] = firestore.collection("modules").doc(programmeDoc.core[i]).get();
             }
             return Promise.all(promises);
         })
@@ -1934,7 +1938,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
             core = snapshots;
             snapshots.forEach(_module => {
                 var module = _module.data();
-                if(!module.prerequisites.every(p => programmesDoc.core.includes(p))){
+                if(!module.prerequisites.every(p => programmeDoc.core.includes(p))){
                     reject.push(module.name);
                 }
             });
@@ -1947,7 +1951,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
         // GRD8 - There are not more than 60 credits worth of core modules in any semester
         .then(() => {
             var sums = [];
-            for(y=1;y<=programmesDoc.duration;y++){
+            for(y=1;y<=programmeDoc.duration;y++){
                 sums[y] = []
             }
             var reject = [];
@@ -1955,7 +1959,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
                 var module = _module.data();
                 sums[module.year][module.semester] += module.credits;
             })
-            for (y=1;y<=programmesDoc.duration;y++){
+            for (y=1;y<=programmeDoc.duration;y++){
                 for(s=1;s<=2;s++){
                     if(sums[y][s] > 60){
                         reject.push("Year "+y+", Semester "+s+"\n")
@@ -1972,7 +1976,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
         // GRD9 - There are at least 60 credits worth of modules in every semester
         .then(() => {
             var sums = [];
-            for(y=1;y<=programmesDoc.duration;y++){
+            for(y=1;y<=programmeDoc.duration;y++){
                 sums[y] = []
             }
             var reject = [];
@@ -1980,7 +1984,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
                 var module = _module.data();
                 sums[module.year][module.semester] += module.credits;
             })
-            for (y=1;y<=programmesDoc.duration;y++){
+            for (y=1;y<=programmeDoc.duration;y++){
                 for(s=1;s<=2;s++){
                     if(sums[y][s] < 60){
                         reject.push("Year "+y+", Semester "+s+"\n")
