@@ -241,22 +241,22 @@ const AddOutcome = {
 }
 const ConfirmRemoveOutcome = {
     props: {
-        pendingDelete: String
+        pending: Object
     },
     template: `
-    <div class="modal" v-bind:class="{'is-active': pendingDelete}">
+    <div class="modal" v-bind:class="{'is-active': pending}">
             <div class="modal-background"></div>
             <div class="modal-card">
             <header class="modal-card-head">
                 <p class="modal-card-title">Confirm decision</p>
-                <button class="delete" aria-label="close" v-on:click="$emit('update:pendingDelete', null)"></button>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:pending', null)"></button>
             </header>
             <section class="modal-card-body">
-                <p>Are you sure you wish to remove outcome {{ pendingDelete }} from this programme?</p>
+                <p class="content is-medium">Are you sure you wish to remove learning outcome <strong>\"{{ pending.text }}\"</strong> from this programme?</p>
             </section>
             <footer class="modal-card-foot">
                 <button class="button is-danger" v-on:click="$emit('submit')">Confirm</button>
-                <button class="button" v-on:click="$emit('update:pendingDelete', null)">Cancel</button>
+                <button class="button" v-on:click="$emit('update:pending', null)">Cancel</button>
             </footer>
             </div>
         </div>
@@ -688,7 +688,7 @@ const RenameModule = {
         moduleName: String
     },
     created: function(){
-        this.pending = this.programmeName;
+        this.pending = this.moduleName;
     },
     template: `
     <div class="modal" v-bind:class="{'is-active': showing}">
@@ -727,7 +727,7 @@ const TransferModuleOwnership = {
                 <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
             </header>
             <section class="modal-card-body">
-                <div class="content is-medium"
+                <div class="content is-medium">
                     <p>Enter the email of the user you would like to transfer module ownership to. Once you confirm the transfer, you will no longer be able to make changes to this module</p>
                 </div>
                 <input class="input" type="text" placeholder="Email" v-model="pending">
@@ -785,7 +785,7 @@ const ChangeModuleSemester = {
     },
     computed:{
         pending: function(){
-            return current === 1 ? 2 : 1
+            return this.current === 1 ? 2 : 1
         }
     },
     template: `
@@ -814,22 +814,37 @@ const ChangeModuleSemester = {
 const AssignPrerequisite = {
     data: function(){
         return {
-            eligible: []
+            eligible: [],
+            ready: false
         }
     },
     props: {
         showing: Boolean,
-        module: Object,
-        ready: Boolean
+        module: Object
     },
     methods: {
         getEligible(){
-            firebase.firestore().collection("modules").where(FieldValue.id)
+            var promises = [];
+            promises.push(firebase.firestore().collection("modules").where("year", "<", this.module.year).get())
+            promises.push(firebase.firestore().collection("modules").where("year", "==", this.module.year).where("semester", "<", this.module.semester).get())
+            Promise.all(promises)
+            .then(snapshots => {
+                for(snapshot of snapshots){
+                    for(doc of snapshot.docs){
+                        if(!this.module.prerequisites.includes(doc.id)){
+                            var data = doc.data();
+                            data.id = doc.id;
+                            this.eligible.push(data);
+                        }
+                    }
+                }
+                this.ready = true;  
+            })
         }
     },
     watch: {
         showing: function(){
-            if(showing === true){
+            if(this.showing === true){
                 this.ready = false;
                 this.eligible = [];
                 this.getEligible();
@@ -837,20 +852,86 @@ const AssignPrerequisite = {
         }
     },
     template: `
+    <div class="modal" v-bind:class="{'is-active': showing}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Assign Prerequisite</p>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
+            </header>
+            <section class="modal-card-body">
+                <div class="content is-medium" v-if="ready">
+                    <ul v-if="eligible.length > 0">
+                        <li v-for="m in eligible">
+                            <h1 class="title is-4">{{ m.name }} <a v-on:click="$emit('submit', m)"><i class="fas fa-plus-circle"></i></a></h1>
+                        </li>
+                    </ul>
+                    <p v-else>No eligible modules</p>
+                </div>
+                <div v-else class="content is-medium">
+                    <p>Processing, please wait...</p>
+                </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            </footer>
+        </div>
+    </div>
     `
 }
-const ConfirmDeletePrerequisite = {
+const ConfirmUnassignPrerequisite = {
     props: {
-
+        pending: Object
     },
     template: `
+    <div class="modal" v-bind:class="{'is-active': pending}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Confirm Decision</p>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
+            </header>
+            <section class="modal-card-body">
+                <div class="content is-medium">
+                    <p>Are you sure you wish to unassign prerequisite <strong>{{ pending.name }}</strong> from this module?</p>
+                </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-danger" v-on:click="$emit('submit')">Confirm</button>
+                <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            </footer>
+        </div>
+    </div>
     `
 }
 const ConfirmDeleteModule = {
+    data: function(){
+        return {
+            confirm: ""
+        }
+    },
     props: {
-
+        showing: Boolean,
+        moduleName: String
     },
     template: `
+    <div class="modal" v-bind:class="{'is-active': showing}">
+        <div class="modal-background"></div>
+            <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Confirm decision</p>
+                <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
+            </header>
+            <section class="modal-card-body">
+                <p>Are you sure you wish to delete this module? This action cannot be undone. To confirm this decision, please type the name of the module in the box below.</p>
+                <input class="input" type="text" placeholder="Module Name" v-model="confirm">
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-danger" v-on:click="$emit('submit')" v-bind:disabled="!(confirm===moduleName)">Confirm</button>
+                <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            </footer>
+        </div>
+    </div>
     `
 }
 
@@ -1322,7 +1403,7 @@ const ProgrammeEditor = {
                             <div class="content is-medium">
                                 <ol>
                                     <li v-for="(o, i) in programme.outcomes" v-bind:value="i">
-                                        {{ o }} <a v-if="userIsAdmin && !programme.published" v-on:click="pendingDeleteOutcome = i"><i class="fas fa-minus-circle"></i></a>
+                                        {{ o }} <a v-if="userIsAdmin && !programme.published" v-on:click="pendingDeleteOutcome = {'id':i,'text':o}"><i class="fas fa-minus-circle"></i></a>
                                         <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
                                             <a v-on:click="pendingMapOutcome = i">Map module outcome</a>
                                         </div>
@@ -1359,10 +1440,8 @@ const ProgrammeEditor = {
                                                     <h3 class="title is-4">{{ type }}</h3>
                                                     <ul>    
                                                         <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]">
-                                                            <h3 class="title is-4">{{ m.name }}</h3>
+                                                            <h3 class="title is-4"><router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link> <a v-if="userIsAdmin && !programme.published" v-on:click="pendingDelete = m"><i class="fas fa-minus-circle"></i></a></h3>
                                                             <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
-                                                                <router-link v-bind:to="'/modules/'+m.id"><i class="fas fa-edit"></i></router-link> -  
-                                                                <a v-on:click="pendingDelete = m"><i class="fas fa-minus-circle"></i></a> - 
                                                                 <a v-on:click="toggleCore(m)">Mark as {{ type==='Core' ? 'optional' : 'core' }}</a>
                                                             </div>
                                                         </li>
@@ -1404,8 +1483,8 @@ const ProgrammeEditor = {
         />
         <confirm-remove-outcome
             v-if="pendingDeleteOutcome"
-            v-bind:pendingDelete.sync="pendingDeleteOutcome"
-            v-on:submit="removeOutcome(pendingDeleteOutcome)"
+            v-bind:pending.sync="pendingDeleteOutcome"
+            v-on:submit="removeOutcome(pendingDeleteOutcome.id)"
         />
         <map-outcome
             v-if="pendingMapOutcome"
@@ -1466,8 +1545,16 @@ const ModuleEditor = {
             programmes: [],
             ready: false,
             editable: true,
+            pendingUnassignPrerequisite: null,
+            pendingRemoveOutcome: null,
             modals: {
                 addOutcome: false,
+                renameModule: false,
+                transferOwnership: false,
+                changeYear: false,
+                changeSemester: false,
+                assignPrerequisite: false,
+                confirmDeleteModule: false
             }
         }
     },
@@ -1478,36 +1565,49 @@ const ModuleEditor = {
     },
     components: {
         'add-outcome': AddOutcome,
+        'rename-module': RenameModule,
+        'transfer-module-ownership': TransferModuleOwnership,
+        'change-year': ChangeModuleYear,
+        'change-semester': ChangeModuleSemester,
+        'confirm-remove-outcome': ConfirmRemoveOutcome,
+        'confirm-delete-module': ConfirmDeleteModule,
+        'assign-prerequisite': AssignPrerequisite,
+        'confirm-unassign-prerequisite': ConfirmUnassignPrerequisite
     },
     methods: {
-        update: function () {
-            this.module = null;
-            this.leader = null;
-            this.prerequisites = [];
-            this.ready = false;
-            firebase.firestore().collection("modules").doc(this.$route.params.id).get()
+        getModule: function(){
+            return firebase.firestore().collection("modules").doc(this.$route.params.id).get()
             .then(snapshot => {
                 this.module = snapshot.data();
-                return axios.post(apiRoot+"/getUser",{
-                    uid: this.module.leader
-                })
+            })
+        },
+        getLeader: function(){
+            return axios.post(apiRoot+"/getUser",{
+                uid: this.module.leader
             })
             .then(response => {
                 this.leader = response.data;
-                var promises = [];
-                this.module.prerequisites.forEach(module => {
-                    promises.push(firebase.firestore().collection("modules").doc(module).get());
-                })
-                return Promise.all(promises);
             })
+        },
+        getPrerequisites: function(){
+            var prerequisites = [];
+            var promises = [];
+            this.module.prerequisites.forEach(module => {
+                promises.push(firebase.firestore().collection("modules").doc(module).get());
+            })
+            return Promise.all(promises)
             .then(snapshots => {
                 for(i=0;i<snapshots.length;i++){
                     var moduleDoc = snapshots[i].data();
                     moduleDoc.id = snapshots[i].id;
-                    this.prerequisites.push(moduleDoc)
+                    prerequisites.push(moduleDoc)
                 }
-                return firebase.firestore().collection("programmes").where("modules","array-contains", this.$route.params.id).get();
-            })
+                this.prerequisites = prerequisites;
+            });
+        },
+        getProgrammes: function(){
+            programmes = [];
+            return firebase.firestore().collection("programmes").where("modules","array-contains", this.$route.params.id).get()
             .then(snapshot => {
                 var snapshots = snapshot.docs;
                 for(i=0;i<snapshots.length;i++){
@@ -1516,10 +1616,18 @@ const ModuleEditor = {
                     if(programmeDoc.published){
                         this.editable = false;
                     }
-                    this.programmes.push(programmeDoc)
+                    programmes.push(programmeDoc)
                 }
-                this.ready = true;
+                this.programmes = programmes;
             })
+        },
+        update: function(){
+            this.ready = false;
+            this.getModule()
+            .then(() => this.getLeader())
+            .then(() => this.getPrerequisites())
+            .then(() => this.getProgrammes())
+            .then(() => this.ready = true)
         },
         sendRequest: function(endpoint, data, needsAuth=true){
             if(needsAuth){
@@ -1532,6 +1640,9 @@ const ModuleEditor = {
             }
             else return axios.post(apiRoot + "/" + endpoint, data)
         },
+        alertError: function(error){
+
+        },
         addOutcome: function(outcome){
             this.modals.addOutcome = false;
             this.sendRequest("assignModuleOutcome", {
@@ -1539,24 +1650,67 @@ const ModuleEditor = {
                 outcome: outcome
             })
             .then(response => {
-                this.update();
+                this.getModule();
             })
             .catch(error => {
-                alert(error);
+                this.alertError(error);
             })
         },
         removeOutcome: function(outcomeId){
-            this.pendingDeleteOutcome = null;
+            this.pendingRemoveOutcome = null;
             this.sendRequest("unassignModuleOutcome", {
                 module: this.$route.params.id,
                 outcomeId: outcomeId
             })
             .then(response => {
-                this.update();
+                this.getModule();
             }).catch(error => {
-                alert(error);
+                this.alertError(error);
             })
         },
+        assignPrerequisite: function(target){
+            this.modals.assignPrerequisite = false;
+            this.sendRequest("assignPrerequisite", {
+                module1: this.$route.params.id,
+                module2: target.id
+            })
+            .then(response => {
+                this.getModule()
+                .then(() => this.getPrerequisites())
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
+        },
+        unassignPrerequisite: function(target){
+            this.pendingUnassignPrerequisite = null;
+            this.sendRequest("unassignPrerequisite", {
+                module1: this.$route.params.id,
+                module2: target.id
+            })
+            .then(response => {
+                this.getModule()
+                .then(() => this.getPrerequisites())
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
+        },
+        renameModule: function(name){
+
+        },
+        transferOwnership: function(target){
+
+        },
+        changeYear: function(year){
+
+        },
+        changeSemester: function(semester){
+
+        },
+        deleteModule: function(){
+
+        }
     },
     created: function(){
         firebase.auth().onAuthStateChanged(user => {
@@ -1579,20 +1733,20 @@ const ModuleEditor = {
                         <div class="level-left">
                             <div>
                                 <h1 class="title">
-                                    {{ module.name }} <a v-if="userIsLeader"><i class="fas fa-edit"></i></a>
+                                    {{ module.name }} <a v-if="userIsLeader" v-on:click="modals.renameModule=true"><i class="fas fa-edit"></i></a>
                                 </h1>
                                 <h2 class="subtitle">
-                                    Led by {{ leader.displayName }} <a v-if="userIsLeader"><i class="fas fa-edit"></i></a>
+                                    Led by {{ leader.displayName }} <a v-if="userIsLeader" v-on:click="modals.transferOwnership=true"><i class="fas fa-edit"></i></a>
                                 </h2>
                             </div>
                         </div>
                         <div class="level-right">
                             <div>
                                 <h2 class="title is-5">
-                                    Year: {{ module.year }} <a v-if="userIsLeader"><i class="fas fa-edit"></i></a>
+                                    Year: {{ module.year }} <a v-if="userIsLeader" v-on:click="modals.changeYear=true"><i class="fas fa-edit"></i></a>
                                 </h2>
                                 <h2 class="title is-5">
-                                    Semester: {{ module.semester }} <a v-if="userIsLeader"><i class="fas fa-edit"></i></a>
+                                    Semester: {{ module.semester }} <a v-if="userIsLeader" v-on:click="modals.changeSemester=true"><i class="fas fa-edit"></i></a>
                                 </h2>
                             </div>
                         </div>
@@ -1614,8 +1768,8 @@ const ModuleEditor = {
                             </h1>
                             <div class="content is-medium">
                                 <ol v-if="Object.keys(module.outcomes).length > 0">
-                                    <li v-for="(o, index) in module.outcomes" v-bind:value="index">
-                                        {{ o }} <a v-if="userIsLeader && editable"><i class="fas fa-minus-circle"></i></a>
+                                    <li v-for="(o, i) in module.outcomes" v-bind:value="i">
+                                        {{ o }} <a v-if="userIsLeader && editable" v-on:click="pendingRemoveOutcome={'id':i,'text':o}"><i class="fas fa-minus-circle"></i></a>
                                     </li>
                                 </ol>
                                 <div v-else>
@@ -1627,12 +1781,12 @@ const ModuleEditor = {
                     <div class="tile is-parent">
                         <div class="tile is-child is-danger notification">
                             <h1 class="title is-3">
-                                Prerequisites <a v-if="userIsLeader"><i class="fas fa-plus-circle"></i></a>
+                                Prerequisites <a v-if="userIsLeader" v-on:click="modals.assignPrerequisite=true"><i class="fas fa-plus-circle"></i></a>
                             </h1>
                             <div class="content is-medium">
                                 <ul v-if="prerequisites.length > 0">
                                     <li v-for="m in prerequisites">
-                                        <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link>
+                                        <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link> <a v-if="userIsLeader && editable" v-on:click="pendingUnassignPrerequisite=m"><i class="fas fa-minus-circle"></i></a>
                                     </li>
                                 </ul>
                                 <div v-else>
@@ -1660,13 +1814,51 @@ const ModuleEditor = {
                     </div>
                 </div>
                 <div class="tile is-parent">
-                    <a v-if="userIsLeader && editable">Delete Module</a>
+                    <a v-if="userIsLeader && editable" v-on:click="modals.confirmDeleteModule=true">Delete Module</a>
                 </div>
             </div>
         </div>
+        <rename-module
+            v-bind:showing.sync="modals.renameModule"
+            v-bind:moduleName="module.name"
+            v-on:submit="renameModule($event)"
+        />
+        <transfer-module-ownership
+            v-bind:showing.sync="modals.transferOwnership"
+            v-on:submit="transferOwnership($event)"
+        />
+        <change-year
+            v-bind:showing.sync="modals.changeYear"
+            v-bind:current="module.year"
+            v-on:submit="changeYear($event)"
+        />
+        <change-semester
+            v-bind:showing.sync="modals.changeSemester"
+            v-bind:current="module.semester"
+            v-on:submit="changeSemester($event)"
+        />
         <add-outcome 
             v-bind:showing.sync="modals.addOutcome"
             v-on:submit="addOutcome($event)"
+        />
+        <confirm-remove-outcome
+            v-if="pendingRemoveOutcome"
+            v-bind:pending.sync="pendingRemoveOutcome"
+            v-on:submit="removeOutcome(pendingRemoveOutcome.id)"
+        />
+        <assign-prerequisite
+            v-bind:showing.sync="modals.assignPrerequisite"
+            v-bind:module="module"
+            v-on:submit="assignPrerequisite($event)"
+        />
+        <confirm-unassign-prerequisite
+            v-if="pendingUnassignPrerequisite"
+            v-bind:pending.sync="pendingUnassignPrerequisite"
+            v-on:submit="unassignPrerequisite(pendingUnassignPrerequisite)"
+        />
+        <confirm-delete-module
+            v-bind:showing.sync="modals.confirmDeleteModule"
+            v-on:submit="deleteModule()"
         />
     </div>
     `
