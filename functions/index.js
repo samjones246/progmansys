@@ -2326,6 +2326,55 @@ exports.renameProgramme = functions.https.onRequest((req, res) => {
 
 exports.renameModule = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const module = req.body.module;
+        const name = req.body.name;
+        var uid;
+        var moduleDoc;
+        var moduleRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Module exists
+        .then(() => {
+            return firestore.collection("modules").doc(module).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                moduleDoc = snapshot.data();
+                moduleRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Module not found"));
+            }
+        })
+        // GRD3 - Requesting user is module leader
+        .then(() => {
+            if(moduleDoc.leader === uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the module leader can perform this action"));
+            }
+        })
+        // ACT1 - Rename module
+        .then(() => {
+            return moduleRef.update("name", name);
+        })
+        .then(result => {
+            return moduleRef.get();
+        })
+        .then(snapshot => {
+            res.send(snapshot.data());
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
     });
 });
 

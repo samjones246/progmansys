@@ -1408,7 +1408,7 @@ const ProgrammeEditor = {
                                             <a v-on:click="pendingMapOutcome = i">Map module outcome</a>
                                         </div>
                                         <ul>
-                                            <li v-for="(m, j) in programme.mapping[i]">
+                                            <li v-for="(m, j) in programme.mapping[i]" v-if="programme.mapping[i][j].length > 0">
                                                 {{ getModuleById(j).name }}
                                                 <ol>
                                                     <li v-for="o2 in programme.mapping[i][j]" v-bind:value="o2">
@@ -1697,19 +1697,73 @@ const ModuleEditor = {
             })
         },
         renameModule: function(name){
-
+            this.modals.renameModule = false;
+            this.sendRequest("renameModule", {
+                module: this.$route.params.id,
+                name: name
+            })
+            .then(response => {
+                this.getModule();
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
         },
         transferOwnership: function(target){
-
+            this.modals.transferOwnership = false;
+            this.sendRequest("getUserByEmail", {
+                email: target
+            })
+            .then(user => {
+                return this.sendRequest("transferModuleOwnership", {
+                    module: this.$route.params.id,
+                    targetUid: user.data.uid
+                });
+            })
+            .then(response => {
+                this.getModule();
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
         },
         changeYear: function(year){
-
+            this.modals.changeYear = false;
+            this.sendRequest("changeYear", {
+                module: this.$route.params.id,
+                year: year
+            })
+            .then(response => {
+                this.getModule();
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
         },
         changeSemester: function(semester){
-
+            this.modals.changeSemester = false;
+            this.sendRequest("changeSemester", {
+                module: this.$route.params.id,
+                semester: semester
+            })
+            .then(response => {
+                this.getModule();
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
         },
         deleteModule: function(){
-
+            this.modals.confirmDeleteModule = false;
+            this.sendRequest("deleteModule", {
+                module: this.$route.params.id
+            })
+            .then(response => {
+                window.location.replace("/#/modules")
+            })
+            .catch(error => {
+                this.alertError(error);
+            })
         }
     },
     created: function(){
