@@ -52,10 +52,10 @@
                 Create
               </a>
               <div class="navbar-dropdown">
-                <a class="navbar-item" v-on:click="$refs.createProgramme.show()">
+                <a class="navbar-item" v-on:click="modals.createProgramme = true">
                   Programme
                 </a>
-                <a class="navbar-item" v-on:click="$refs.createModule.show()">
+                <a class="navbar-item" v-on:click="modals.createModule = true">
                   Module
                 </a>
               </div>
@@ -82,8 +82,19 @@
       </nav>
       <router-view></router-view>
       <div id="firebaseui-auth-container"></div>
-      <create-programme ref="createProgramme"></create-programme>
-      <create-module ref="createModule"/>
+      <button class="button" v-on:click="modals.genericTest=1">Test</button>
+      <remove-modal 
+        v-bind:showing.sync="modals.genericTest"
+        v-on:submit="modals.genericTest = 0"
+      >Test</remove-modal>
+      <create-module
+        v-bind:showing.sync="modals.createModule"
+        v-on:submit="createModule($event.name, parseInt($event.year), parseInt($event.semester), parseInt($event.credits))"
+      ></create-module>
+      <create-programme
+        v-bind:showing.sync="modals.createProgramme"
+        v-on:submit="createProgramme($event.name, parseInt($event.duration))"
+      ></create-programme>
     </div>
   <script type="text/javascript" src="functions.js"></script>
   <script src="index.html.js"></script>

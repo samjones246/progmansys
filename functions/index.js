@@ -65,11 +65,13 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
         }).then(documentRef => {
             return documentRef.get();
         }).then(snapshot => {
-            res.send(snapshot.data());
-            return 0;
+            var data = snapshot.data();
+            data.id = snapshot.id;
+            res.send(data);
+            return;
         }).catch(error => {
             res.status(400).send(error.message)
-            return 0;
+            return;
         });
     });
 });
@@ -133,11 +135,10 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
         .then(documentRef => {
             return documentRef.get();
         })
-        .then(doc => {
-            res.send({
-                id: doc.id,
-                data: doc.data()
-            });
+        .then(snapshot => {
+            var data = snapshot.data();
+            data.id = snapshot.id;
+            res.send(data);
             return;
         })
         .catch(error => {
@@ -1729,6 +1730,87 @@ exports.changeYear = functions.https.onRequest((req, res) => {
         // ACT1 - Change year
         .then(() => {
             return moduleRef.update("year", year);
+        })
+        .then(result => {
+            return moduleRef.get();
+        })
+        .then(snapshot => {
+            res.send(snapshot.data());
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
+    });
+});
+
+exports.changeCredits = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const module = req.body.module;
+        const credits = req.body.credits;
+        var uid;
+        var moduleDoc;
+        var moduleRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Module exists
+        .then(() => {
+            return firestore.collection("modules").doc(module).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                moduleDoc = snapshot.data();
+                moduleRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Module not found"));
+            }
+        })
+        // GRD3 - Requesting user is module leader
+        .then(() => {
+            if(moduleDoc.leader == uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the module leader can perform this action"));
+            }
+        })
+        // GRD4 - Credits value is valid
+        .then(() => {
+            if([15,30,45,60].includes(credits)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Credits value is invalid"));
+            }
+        })
+        // GRD5 - Credits value is different from currently assigned credits value
+        .then(() => {
+            if(credits === moduleDoc.credits){
+                return Promise.reject(Error("Must specify a different number of credits to the one already assigned"))
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // GRD8 - Module is not a member of any published programme
+        .then(() => {
+            return firestore.collection('programmes').where("modules", "array-contains", module).get();
+        })
+        .then(snapshot => {
+            snapshot.docs.forEach(element => {
+                if(element.published){
+                    return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+                }
+            })
+            return Promise.resolve();
+        })
+        // ACT1 - Change credits
+        .then(() => {
+            return moduleRef.update("credits", credits);
         })
         .then(result => {
             return moduleRef.get();
