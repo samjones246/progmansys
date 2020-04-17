@@ -65,9 +65,7 @@
           <div class="navbar-end">
             <div v-if="!user" class="navbar-item">
               <div class="buttons">
-                <a class="button is-primary" v-on:click="login">
-                  <strong>Sign up / Log in</strong>
-                </a>
+                <router-link class="button is-primary" v-bind:to="'/signin?redirect=/#'+$route.path"><strong>Sign up / Log in</strong></router-link>
               </div>
             </div>
             <div v-else class="navbar-item">
@@ -82,11 +80,6 @@
       </nav>
       <router-view></router-view>
       <div id="firebaseui-auth-container"></div>
-      <button class="button" v-on:click="modals.genericTest=1">Test</button>
-      <remove-modal 
-        v-bind:showing.sync="modals.genericTest"
-        v-on:submit="modals.genericTest = 0"
-      >Test</remove-modal>
       <create-module
         v-bind:showing.sync="modals.createModule"
         v-on:submit="createModule($event.name, parseInt($event.year), parseInt($event.semester), parseInt($event.credits))"
