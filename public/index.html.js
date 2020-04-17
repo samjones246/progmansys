@@ -15,12 +15,24 @@ const ProgrammeList = {
     data: function(){
         return {
             user: null,
-            programmes: []
+            searchString: "",
+            programmes: [],
+            filters: {
+                role: {
+                    leader: true,
+                    admin: true,
+                    none: true
+                },
+                state: {
+                    published: true,
+                    unpublished: true
+                }
+            }
         }
     },
     methods: {
         getProgrammes: function () {
-            firebase.firestore().collection("programmes").where("administrators", "array-contains", this.user.uid).get()
+            firebase.firestore().collection("programmes").get()
             .then(snapshot => {
                 snapshot.docs.forEach(doc => {
                     var data = doc.data();
@@ -33,11 +45,24 @@ const ProgrammeList = {
     },
     created: function(){
         firebase.auth().onAuthStateChanged(user => {
-            this.user = user;
             if(user){
-                this.getProgrammes();
+                this.user = user;
+            }else{
+                this.user = {uid:"-1"}
             }
+            this.getProgrammes();
         })
+    },
+    computed: {
+        validProgrammes: function(){
+            return this.programmes
+            .filter(p => this.searchString.length == 0 || p.name.toLowerCase().includes(this.searchString.toLowerCase()))
+            .filter(p => this.filters.role.leader || !(p.leader==this.user.uid))
+            .filter(p => this.filters.role.admin || !(p.administrators.includes(this.user.uid) && !(p.leader==this.user.uid)))
+            .filter(p => this.filters.role.none || p.administrators.includes(this.user.uid))
+            .filter(p => this.filters.state.published || !p.published)
+            .filter(p => this.filters.state.unpublished || p.published)
+        }
     },
     template: 
     `
@@ -53,12 +78,71 @@ const ProgrammeList = {
                 </div>
             </div>
         </section>
-        <section v-for="p in programmes" class="container is-primary is-light">
+        <br>
+        <div class="container">
+            <div class="control has-icons-left">
+                <input class="input" type="text" placeholder="Search" v-model="searchString">
+                <span class="icon is-left">
+                    <i class="fas fa-search"></i>
+                </span>
+            </div>
+            <nav class="navbar">
+                <div class="navbar-menu">
+                    <div class="navbar-start">
+                        <div class="navbar-item has-dropdown is-hoverable">
+                            <a class="navbar-link">
+                                <strong>My Role</strong>
+                            </a>
+                            <div class="navbar-dropdown">
+                                <a class="navbar-item">
+                                    <label class="label">
+                                        <input type="checkbox" v-model="filters.role.leader">
+                                        Leader
+                                    </label>
+                                </a>
+                                <a class="navbar-item">
+                                    <label class="label">
+                                        <input type="checkbox" v-model="filters.role.admin">
+                                        Administrator
+                                    </label>
+                                </a>
+                                <a class="navbar-item">
+                                    <label class="label">
+                                        <input type="checkbox" v-model="filters.role.none">
+                                        None
+                                    </label>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="navbar-item has-dropdown is-hoverable">
+                            <a class="navbar-link">
+                                <strong>Programme Status</strong>
+                            </a>
+                            <div class="navbar-dropdown">
+                                <a class="navbar-item">
+                                    <label class="label">
+                                        <input type="checkbox" v-model="filters.state.published">
+                                        Published
+                                    </label>
+                                </a>
+                                <a class="navbar-item">
+                                    <label class="label">
+                                        <input type="checkbox" v-model="filters.state.unpublished">
+                                        Unpublished
+                                    </label>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+        <section v-for="p in validProgrammes" class="container is-primary is-light">
             <br>
-            <p class="title">{{ p.name }}</p>
-            <p class="subtitle">
-                <router-link v-bind:to="'programmes/'+p.id">Edit</router-link> - <a>View</a>
-            </p>
+            <router-link class="box" v-bind:to="'programmes/'+p.id">
+                <h1 class="title">{{ p.name }}</h1>
+                <h2 class="subtitle">{{ p.published ? "Published" : "Unpublished" }}</h2>
+            </router-link>
         </section>
     </div>
     `
@@ -67,7 +151,14 @@ const ModuleList = {
     data: function(){
         return {
             user: null,
-            modules: []
+            searchString: "",
+            modules: [],
+            filters: {
+                role: {
+                    leader: true,
+                    none: true
+                }
+            }
         }
     },
     methods: {
@@ -91,6 +182,14 @@ const ModuleList = {
             }
         })
     },
+    computed: {
+        validModules: function(){
+            return this.modules
+            .filter(m => this.searchString.length == 0 || m.name.toLowerCase().includes(this.searchString.toLowerCase()))
+            .filter(m => this.filters.role.leader || !(m.leader==this.user.uid))
+            .filter(m => this.filters.role.none || m.leader==this.user.uid)
+        }
+    },
     template: 
     `
     <div>
@@ -105,12 +204,45 @@ const ModuleList = {
                 </div>
             </div>
         </section>
-        <section v-for="m in modules" class="container is-primary is-light">
+        <br>
+        <div class="container">
+            <div class="control has-icons-left">
+                <input class="input" type="text" placeholder="Search" v-model="searchString">
+                <span class="icon is-left">
+                    <i class="fas fa-search"></i>
+                </span>
+            </div>
+            <nav class="navbar">
+                <div class="navbar-menu">
+                    <div class="navbar-start">
+                        <div class="navbar-item has-dropdown is-hoverable">
+                            <a class="navbar-link">
+                                <strong>My Role</strong>
+                            </a>
+                            <div class="navbar-dropdown">
+                                <a class="navbar-item">
+                                    <label class="label">
+                                        <input type="checkbox" v-model="filters.role.leader">
+                                        Leader
+                                    </label>
+                                </a>
+                                <a class="navbar-item">
+                                    <label class="label">
+                                        <input type="checkbox" v-model="filters.role.none">
+                                        None
+                                    </label>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+        <section v-for="m in validModules" class="container is-primary is-light">
             <br>
-            <p class="title">{{ m.name }}</p>
-            <p class="subtitle">
-                <a>Edit</a> - <router-link v-bind:to="'/modules/'+m.id">View</router-link>
-            </p>
+            <router-link class="box" v-bind:to="'modules/'+m.id">
+                <h1 class="title">{{ m.name }}</h1>
+            </router-link>
         </section>
     </div>
     `
@@ -2368,7 +2500,6 @@ const CreateProgramme = {
       </div>
     `
 }
-
 const SignIn = {
     created: function(){
         uiConfig.signInSuccessUrl = this.$route.query.redirect;
@@ -2432,20 +2563,22 @@ var app = new Vue({
             ui.start('#firebaseui-auth-container', uiConfig);
         },
         createProgramme: function(name, duration){
-            this.modals.createProgramme = false;
+            this.modals.createProgramme = 2;
             this.sendRequest("createProgramme", {
                 name: name,
                 duration: duration
             })
             .then(response => {
+                this.modals.createProgramme = 0;
                 window.location.assign("/#/programmes/"+response.data.id)
             })
             .catch(error => {
+                this.modals.createProgramme = 0;
                 alertError(error)
             })
         },
         createModule: function(name, year, semester, credits){
-            this.modals.createModule = false;
+            this.modals.createModule = 2;
             this.sendRequest("createModule", {
                 name: name,
                 year: year,
@@ -2453,9 +2586,11 @@ var app = new Vue({
                 credits: credits
             })
             .then(response => {
+                this.modals.createModule = 0;
                 window.location.assign("/#/modules/"+response.data.id)
             })
             .catch(error => {
+                this.modals.createModule = 0;
                 alertError(error)
             })
         }
