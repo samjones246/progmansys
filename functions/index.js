@@ -95,7 +95,7 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
         })
         // Check year is valid
         .then(() => {
-            if(year < 1 || year > 2){
+            if(![1,2,3,4].includes(year)){
                 return Promise.reject(Error("Year must be a number between 1 and 4"));
             }else{
                 return Promise.resolve();
@@ -1395,7 +1395,10 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
         // GRD51 & GRD52 - Module 2 occurs before module 1
         .then(() => {
             if(module2Doc.year <= module1Doc.year){
-                if(module2Doc.semester < module1Doc.semester){
+                if(module2Doc.year < module1Doc.year){
+                    return Promise.resolve()
+                }
+                else if(module2Doc.semester < module1Doc.semester){
                     return Promise.resolve();
                 }
             }
@@ -1782,7 +1785,7 @@ exports.changeCredits = functions.https.onRequest((req, res) => {
         })
         // GRD4 - Credits value is valid
         .then(() => {
-            if([15,30,45,60].includes(credits)){
+            if([7.5, 15, 22.5, 30].includes(credits)){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Credits value is invalid"));
@@ -2030,7 +2033,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
                 return Promise.resolve();
             }
         })
-        // GRD8 - There are not more than 60 credits worth of core modules in any semester
+        // GRD8 - There are not more than 30 credits worth of core modules in any semester
         .then(() => {
             var sums = [];
             for(y=1;y<=programmeDoc.duration;y++){
@@ -2043,19 +2046,19 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
             })
             for (y=1;y<=programmeDoc.duration;y++){
                 for(s=1;s<=2;s++){
-                    if(sums[y][s] > 60){
+                    if(sums[y][s] > 30){
                         reject.push("Year "+y+", Semester "+s+"\n")
                     }
                 }
             }
             if(reject.length > 0){
-                return Promise.reject(Error("More than 60 credits worth of core modules in the following semesters:" +reject.toString()));
+                return Promise.reject(Error("More than 30 credits worth of core modules in the following semesters:" +reject.toString()));
             }else{
                 coreSums = sums;
                 return Promise.resolve();
             }
         })
-        // GRD9 - There are at least 60 credits worth of modules in every semester
+        // GRD9 - There are at least 30 credits worth of modules in every semester
         .then(() => {
             var sums = [];
             for(y=1;y<=programmeDoc.duration;y++){
@@ -2068,13 +2071,13 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
             })
             for (y=1;y<=programmeDoc.duration;y++){
                 for(s=1;s<=2;s++){
-                    if(sums[y][s] < 60){
+                    if(sums[y][s] < 30){
                         reject.push("Year "+y+", Semester "+s+"\n")
                     }
                 }
             }
             if(reject.length > 0){
-                return Promise.reject(Error("Less than 60 credits worth of modules in the following semesters:" +reject.toString()))
+                return Promise.reject(Error("Less than 30 credits worth of modules in the following semesters:" +reject.toString()))
             }else{
                 return Promise.resolve();
             }
@@ -2084,7 +2087,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
             var reject = [];
             modules.forEach(_module => {
                 var module = _module.data();
-                if(module.credits + coreSums[module.year][module.semester] > 60){
+                if(module.credits + coreSums[module.year][module.semester] > 30){
                     reject.push(module.name)
                 }
             })
@@ -2452,6 +2455,94 @@ exports.renameModule = functions.https.onRequest((req, res) => {
         .then(snapshot => {
             res.send(snapshot.data());
             return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
+    });
+});
+exports.editProgrammeOutcome = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const programme = req.body.programme;
+        const outcomeId = req.body.outcomeId;
+        const outcome = req.body.outcome;
+        var uid;
+        var programmeDoc;
+        var programmeRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("programmes").doc(programme).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                programmeDoc = snapshot.data();
+                programmeRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Outcome exists
+        .then(() => {
+            if(programmeDoc.outcomes.hasOwnProperty(outcomeId)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme has no outcome with this ID"))
+            }
+        })
+        // GRD4 - New outcome is a string
+        .then(() => {
+            if(typeof outcome == 'string'){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Outcome must be a string"));
+            }
+        })
+        // GRD5 - Requesting user is an administrator
+        .then(() => {
+            return admin.auth().verifyIdToken(idToken);
+        })
+        .then(decodedToken => {
+            uid = decodedToken.uid; 
+            if(!programmeDoc.administrators.includes(uid)){
+                return Promise.reject(Error("Only a programme administrator can perform this action"));
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // GRD6 - The outcome is not already an outcome of the programme
+        .then(() => {
+            for (element in programmeDoc.outcomes) {
+                if(programmeDoc.outcomes[element] === outcome){
+                    return Promise.reject(Error("This programme has already been assigned an identical outcome"));
+                }
+            }
+            return Promise.resolve();
+        })
+        // GRD7 - Programme is not published
+        .then(() => {
+            if(programmeDoc.published){
+                return Promise.reject(Error("Cannot edit a published programme"));
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // ACT1 - Assign programme outcome
+        .then(() => {
+            programmeDoc.outcomes[outcomeId] = outcome;
+            return programmeRef.update("outcomes."+outcomeId, outcome);
+        })
+        .then(result => {
+            res.send(programmeDoc.outcomes);
         })
         // If a guard failed, respond with the error
         .catch(error => {

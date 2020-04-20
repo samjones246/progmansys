@@ -41,6 +41,14 @@ const ProgrammeList = {
                 })
                 return;
             })
+        },
+        role: function(programme){
+            if(this.user.uid===programme.leader){
+                return "Leader"
+            }
+            if(programme.administrators.includes(this.user.uid)){
+                return "Administrator"
+            }else return ""
         }
     },
     created: function(){
@@ -140,8 +148,20 @@ const ProgrammeList = {
         <section v-for="p in validProgrammes" class="container is-primary is-light">
             <br>
             <router-link class="box" v-bind:to="'programmes/'+p.id">
-                <h1 class="title">{{ p.name }}</h1>
-                <h2 class="subtitle">{{ p.published ? "Published" : "Unpublished" }}</h2>
+            <div class="level">
+                <div class="level-left">
+                    <div>
+                        <h1 class="title">{{ p.name }}</h1>
+                        <h2 class="subtitle">{{ p.published ? "Published" : "Unpublished" }}</h2>
+                    </div>
+                </div>
+                <div class="level-right">
+                    <div>
+                        <h1 class="title is-5">{{ role(p) }}</h1>
+                    </div>
+                </div>
+            </div>
+                
             </router-link>
         </section>
     </div>
@@ -172,6 +192,11 @@ const ModuleList = {
                 })
                 return;
             })
+        },
+        role: function(module){
+            if(module.leader===this.user.uid){
+                return "Leader"
+            }else return ""
         }
     },
     created: function(){
@@ -241,7 +266,18 @@ const ModuleList = {
         <section v-for="m in validModules" class="container is-primary is-light">
             <br>
             <router-link class="box" v-bind:to="'modules/'+m.id">
-                <h1 class="title">{{ m.name }}</h1>
+            <div class="level">
+                <div class="level-left">
+                    <div>
+                        <h1 class="title">{{ m.name }}</h1>
+                    </div>
+                </div>
+                <div class="level-right">
+                    <div>
+                        <h1 class="title is-5">{{ role(m) }}</h1>
+                    </div>
+                </div>
+            </div>
             </router-link>
         </section>
     </div>
@@ -311,17 +347,32 @@ const AddModal = {
 const AddModule = {
     data: function(){
         return {
-            pending: null
+            searchString: ""
         }
     },
     props: {
         showing: Number,
         candidateModules: Array
     },
+    computed: {
+        pending: function(){
+            var count = 0;
+            for (module of this.candidateModules){
+                if(module.state == 1){
+                    count++;
+                }
+            }
+            return count;
+        }
+    },
     methods: {
         submit(module){
-            this.pending = module;
+            module.state=1;
             this.$emit('submit', module);
+        },
+        finish(){
+            console.log("a")
+            this.$forceUpdate();
         }
     },
     template: `
@@ -333,6 +384,12 @@ const AddModule = {
             </header>
             <section class="modal-card-body">
                 <div class="content">
+                    <p class="control has-icons-left">
+                        <input class="input" type="text" placeholder="Search" v-model="searchString">
+                        <span class="icon is-left">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </p>
                     <ul>
                         <li v-for="(year, i) in candidateModules">
                             <h1 class="title is-4">Year {{ i+1 }}</h1>
@@ -340,11 +397,12 @@ const AddModule = {
                                 <li v-for="(semester, j) in year">
                                     <h1 class="title is-4">Semester {{ j+1 }}</h1>
                                     <ul>
-                                        <li v-for="(module, k) in semester">
+                                        <li v-for="(module, k) in semester.filter(m => searchString.length == 0 || m.name.includes(searchString))">
                                             <h1 class="title is-4">
-                                                {{ module.name }} 
-                                                <a v-if="showing==1" v-on:click="submit(module)"><i class="fas fa-plus-circle"></i></a>
-                                                <i v-if="showing==2 && pending===module" class="fas fa-circle-notch fa-spin"></i>
+                                                {{ module.name }}
+                                                <span v-show="module.state == 2"><i class="fas fa-check"></i></span>
+                                                <span v-show="module.state == 1"><i class="fas fa-circle-notch fa-spin"></i></span>
+                                                <a v-show="module.state == 0" v-on:click="submit(module)"><i class="fas fa-plus-circle"></i></a>
                                             </h1>
                                         </li>
                                     </ul>
@@ -355,7 +413,7 @@ const AddModule = {
                 </div>
             </section>
             <footer class="modal-card-foot">
-                <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
+                <button class="button" v-bind:disabled="pending.length > 0" v-on:click="$emit('update:showing', 0)">Done</button>
             </footer>
         </div>
     </div>
@@ -443,6 +501,41 @@ const AddOutcome = {
         </section>
         <footer class="modal-card-foot">
             <button class="button is-success" v-on:click="$emit('submit', pending)" v-bind:disabled="pending.length==0 || showing==2" v-bind:class="{'is-loading':showing==2}">Submit</button>
+            <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
+        </footer>
+        </div>
+    </div>
+    `
+}
+const EditOutcome = {
+    data: function(){
+        return {
+            pending: ""
+        }
+    },
+    props: {
+        showing: Number,
+        outcome: Object
+    },
+    watch: {
+        showing: function(){
+            if(this.showing==1){
+                this.pending = this.outcome.text;
+            }
+        }
+    },
+    template:`
+    <div class="modal" v-bind:class="{'is-active': showing}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Edit Learning Outcome</p>
+        </header>
+        <section class="modal-card-body">
+            <input class="input" type="text" placeholder="Learning outcome" v-model="pending">
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-success" v-on:click="$emit('submit', {'id': outcome.id, 'text':pending})" v-bind:disabled="pending.length==0 || showing==2" v-bind:class="{'is-loading':showing==2}">Submit</button>
             <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
         </footer>
         </div>
@@ -743,18 +836,18 @@ const ConfirmPublishProgramme = {
                     var coreTotal = this.totalCredits(this.core[y-1][s-1]);
                     var optionalTotal = this.totalCredits(this.optional[y-1][s-1]);
 
-                    if(coreTotal + optionalTotal < 60){
+                    if(coreTotal + optionalTotal < 30){
                         this.problems.push("Insufficient credits available in <strong>Year "+y+", Semester "+s+"</strong>: "
-                                          +(coreTotal + optionalTotal)+" credits available, must be at least 60");
+                                          +(coreTotal + optionalTotal)+" credits available, must be at least 30");
                     }
 
-                    if(coreTotal > 60){
-                        this.problems.push("More than 60 credits awarded by core modules in <strong>Year "+y+", Semester "+s+"</strong>.")
+                    if(coreTotal > 30){
+                        this.problems.push("More than 30 credits awarded by core modules in <strong>Year "+y+", Semester "+s+"</strong>.")
                     }
 
                     for(module of this.optional[y-1][s-1]){
-                        if(module.credits + coreTotal > 60){
-                            this.problems.push("Module <strong>"+module.name+"</strong> in <strong>Year "+y+", Semester "+s+"</strong> awards "+module.credits+" credits, but only "+(60-coreTotal)+" credits are left to award after core modules.")
+                        if(module.credits + coreTotal > 30){
+                            this.problems.push("Module <strong>"+module.name+"</strong> in <strong>Year "+y+", Semester "+s+"</strong> awards "+module.credits+" credits, but only "+(30-coreTotal)+" credits are left to award after core modules.")
                         }
                         for(prereq of module.prerequisites){
                             if(!this.programme.modules.includes(prereq)){
@@ -1071,7 +1164,7 @@ const ChangeModuleCredits = {
                     <label class="label">New number of credits awarded: </label>
                     <div class="select">
                         <select v-model="pending" v-bind:disabled="showing==2">
-                            <option v-for="i in [15,30,45,60].filter(i => i != current)">
+                            <option v-for="i in [7.5,15,22.5,30].filter(i => i != current)">
                                 {{ i }}
                             </option>
                         </select>
@@ -1079,7 +1172,7 @@ const ChangeModuleCredits = {
                 </div>
             </section>
             <footer class="modal-card-foot">
-                <button class="button is-success" v-on:click="$emit('submit', parseInt(pending))" v-bind:disabled="!pending || showing==2" v-bind:class="{'is-loading':showing==2}">Confirm</button>
+                <button class="button is-success" v-on:click="$emit('submit', parseFloat(pending))" v-bind:disabled="!pending || showing==2" v-bind:class="{'is-loading':showing==2}">Confirm</button>
                 <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
             </footer>
         </div>
@@ -1091,7 +1184,7 @@ const AssignPrerequisite = {
         return {
             eligible: [],
             ready: false,
-            pending: null
+            searchString: ""
         }
     },
     props: {
@@ -1110,21 +1203,37 @@ const AssignPrerequisite = {
                         if(!this.module.prerequisites.includes(doc.id)){
                             var data = doc.data();
                             data.id = doc.id;
+                            data.state = 0;
                             this.eligible.push(data);
                         }
                     }
                 }
                 this.ready = true;  
             })
+        },
+        submit(module){
+            this.$emit('submit', module);
+            module.state=1;
         }
     },
     watch: {
         showing: function(){
-            if(this.showing === true){
+            if(this.showing == 1){
                 this.ready = false;
                 this.eligible = [];
                 this.getEligible();
             }
+        }
+    },
+    computed: {
+        pending: function(){
+            var count = 0;
+            for(module of this.eligible){
+                if(module.state==1){
+                    count++;
+                }
+            }
+            return count;
         }
     },
     template: `
@@ -1136,14 +1245,21 @@ const AssignPrerequisite = {
             </header>
             <section class="modal-card-body">
                 <div class="content is-medium" v-if="ready">
+                    <p class="control has-icons-left">
+                        <input class="input" type="text" placeholder="Search" v-model="searchString">
+                        <span class="icon is-left">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </p>
                     <ul v-if="eligible.length > 0">
-                        <li v-for="m in eligible">
+                        <li v-for="m in eligible.filter(m => searchString.length == 0 || m.name.includes(searchString))">
                             <h1 class="title is-4">
-                                {{ m.name }} 
-                                <a v-if="showing==1" v-on:click="()=>{$emit('submit', m);pending=m}">
+                                {{ m.name }}
+                                <a v-show="m.state==0" v-on:click="submit(m)">
                                     <i class="fas fa-plus-circle"></i>
                                 </a>
-                                <i v-if="showing==2 && pending==m" class="fas fa-circle-notch fa-spin"></i>
+                                <span v-show="m.state==1"><i class="fas fa-circle-notch fa-spin"></i></span>
+                                <span v-show="m.state==2"><i class="fas fa-check"></i></span>
                             </h1>
                         </li>
                     </ul>
@@ -1154,7 +1270,7 @@ const AssignPrerequisite = {
                 </div>
             </section>
             <footer class="modal-card-foot">
-                <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
+                <button class="button" v-bind:disabled="pending > 0" v-on:click="$emit('update:showing', 0)">Done</button>
             </footer>
         </div>
     </div>
@@ -1234,6 +1350,7 @@ const ProgrammeEditor = {
             user: null,
             pendingDelete: null,
             pendingDeleteOutcome: null,
+            pendingEditOutcome: null,
             pendingUnmap: null,
             pendingRemoveAdmin: null,
             candidateModules: [],
@@ -1254,7 +1371,8 @@ const ProgrammeEditor = {
                 changeDuration: 0,
                 confirmPublishProgramme: 0,
                 confirmUnpublishProgramme: 0,
-                confirmDeleteProgramme: 0
+                confirmDeleteProgramme: 0,
+                editOutcome: 0
             }
         }
     },
@@ -1286,7 +1404,8 @@ const ProgrammeEditor = {
         'change-duration': ChangeDuration,
         'confirm-publish-programme': ConfirmPublishProgramme,
         'confirm-unpublish-programme': ConfirmUnpublishProgramme,
-        'confirm-delete-programme': ConfirmDeleteProgramme
+        'confirm-delete-programme': ConfirmDeleteProgramme,
+        'edit-outcome': EditOutcome
     },
     methods: {
         toggleCore: function(module) {
@@ -1325,7 +1444,6 @@ const ProgrammeEditor = {
             })
         },
         assignModule: function(module){
-            this.modals.addModule = 2;
             this.sendRequest("assignModule", {
                 programme: this.$route.params.id,
                 module: module.id
@@ -1336,11 +1454,13 @@ const ProgrammeEditor = {
                    return this.getModules();
                })
                .then(() => {
-                   this.modals.addModule = 0;
+                   module.state=2;
+                   this.$refs.addModule.finish();
                })
             })
             .catch(error => {
-                this.modals.addModule = 0;
+                module.state=2;
+                this.$refs.addModule.finish();
                 alert(error);
             })
         },
@@ -1372,6 +1492,7 @@ const ProgrammeEditor = {
                     var data = document.data();
                     data.id = document.id;
                     if(!this.programme.modules.includes(data.id)){
+                        data.state = 0;
                         this.candidateModules[data.year-1][data.semester-1].push(data);
                     }
                 })
@@ -1678,6 +1799,24 @@ const ProgrammeEditor = {
                 this.modals.confirmDeleteProgramme = 0;
                 this.alertError(error);
             })
+        },
+        editOutcome(id, text){
+            this.modals.editOutcome = 2;
+            this.sendRequest("editProgrammeOutcome", {
+                programme: this.$route.params.id,
+                outcomeId: id,
+                outcome: text
+            })
+            .then(response => {
+                this.getProgramme()
+                .then(() => {
+                    this.modals.editOutcome = 0;
+                })
+            })
+            .catch(error => {
+                this.modals.editOutcome = 0;
+                this.alertError(error)
+            })
         }
     },
     created: function() {
@@ -1737,14 +1876,36 @@ const ProgrammeEditor = {
             <div class="tile is-parent is-vertical">
                 <div class="tile is-parent">
                     <div class="tile is-parent">
-                        <div class="tile is-child is-success notification">
-                            <h1 class="title">
-                                Administrators <a v-if="userIsLeader && !programme.published" v-on:click="modals.addAdministrator = 1"><i class="fas fa-plus-circle"></i></a>
+                        <div class="tile is-child is-danger notification">
+                            <h1 class="title is-3">
+                                Modules <a v-if="userIsAdmin && !programme.published" v-on:click="getCandidateModules()"><i class="fas fa-plus-circle"></i></a>
                             </h1>
                             <div class="content is-medium">
                                 <ul>
-                                    <li v-for="a in administrators">
-                                        {{ a.displayName }} ({{ a.email }}) <a v-if="userIsLeader && !programme.published" v-on:click="()=>{pendingRemoveAdmin=a;modals.removeAdministrator=1}"><i class="fas fa-minus-circle"></i></a>
+                                    <li v-for="y in years">
+                                        <h2 class="title is-4">Year {{ y }}</h2>
+                                        <ul>
+                                            <li v-for="s in [1,2]">
+                                                <h3 class="title is-4">Semester {{ s }} </h3>
+                                                <ul v-if="core[y-1][s-1].length > 0 || optional[y-1][s-1].length > 0">
+                                                    <li v-for="type in ['Core', 'Optional']" v-if="(type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]).length > 0">
+                                                        <h3 class="title is-4">{{ type }}</h3>
+                                                        <ul>    
+                                                            <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]">
+                                                                <h3 class="title is-4"><router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link> <a v-if="userIsAdmin && !programme.published" v-on:click="function(){pendingDelete = m;modals.confirmUnassignModule=1}"><i class="fas fa-minus-circle"></i></a></h3>
+                                                                <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
+                                                                    <a v-on:click="toggleCore(m)">Mark as {{ type==='Core' ? 'optional' : 'core' }}</a>
+                                                                </div>
+                                                            </li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                                <div v-else>
+                                                    <p>No modules assigned</p>
+                                                </div>
+                                                <br v-if="s==1">
+                                            </li>
+                                        </ul>
                                     </li>
                                 </ul>
                             </div>
@@ -1758,7 +1919,13 @@ const ProgrammeEditor = {
                             <div class="content is-medium">
                                 <ol>
                                     <li v-for="(o, i) in programme.outcomes" v-bind:value="i">
-                                        {{ o }} <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingDeleteOutcome = {'id':i,'text':o};modals.removeOutcome=1}"><i class="fas fa-minus-circle"></i></a>
+                                        {{ o }} 
+                                        <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingDeleteOutcome = {'id':i,'text':o};modals.removeOutcome=1}">
+                                            <i class="fas fa-minus-circle"></i>
+                                        </a>
+                                        <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingEditOutcome = {'id':i,'text':o};modals.editOutcome=1}">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
                                         <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
                                             <a v-on:click="()=>{pendingMapOutcome = i;modals.mapOutcome=1}">Map module outcome</a>
                                         </div>
@@ -1778,42 +1945,21 @@ const ProgrammeEditor = {
                         </div>
                     </div>
                 </div>
+                
                 <div class="tile is-parent is-vertical">
-                    <div class="tile is-child is-danger notification">
-                        <h1 class="title is-3">
-                            Modules <a v-if="userIsAdmin && !programme.published" v-on:click="getCandidateModules()"><i class="fas fa-plus-circle"></i></a>
+                    <div class="tile is-child is-success notification">
+                        <h1 class="title">
+                            Administrators <a v-if="userIsLeader && !programme.published" v-on:click="modals.addAdministrator = 1"><i class="fas fa-plus-circle"></i></a>
                         </h1>
                         <div class="content is-medium">
                             <ul>
-                                <li v-for="y in years">
-                                    <h2 class="title is-4">Year {{ y }}</h2>
-                                    <ul>
-                                        <li v-for="s in [1,2]">
-                                            <h3 class="title is-4">Semester {{ s }} </h3>
-                                            <ul v-if="core[y-1][s-1].length > 0 || optional[y-1][s-1].length > 0">
-                                                <li v-for="type in ['Core', 'Optional']" v-if="(type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]).length > 0">
-                                                    <h3 class="title is-4">{{ type }}</h3>
-                                                    <ul>    
-                                                        <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]">
-                                                            <h3 class="title is-4"><router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link> <a v-if="userIsAdmin && !programme.published" v-on:click="function(){pendingDelete = m;modals.confirmUnassignModule=1}"><i class="fas fa-minus-circle"></i></a></h3>
-                                                            <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
-                                                                <a v-on:click="toggleCore(m)">Mark as {{ type==='Core' ? 'optional' : 'core' }}</a>
-                                                            </div>
-                                                        </li>
-                                                    </ul>
-                                                </li>
-                                            </ul>
-                                            <div v-else>
-                                                <p>No modules assigned</p>
-                                            </div>
-                                            <br v-if="s==1">
-                                        </li>
-                                    </ul>
+                                <li v-for="a in administrators">
+                                    {{ a.displayName }} ({{ a.email }}) <a v-if="userIsLeader && !programme.published" v-on:click="()=>{pendingRemoveAdmin=a;modals.removeAdministrator=1}"><i class="fas fa-minus-circle"></i></a>
                                 </li>
                             </ul>
                         </div>
                     </div>
-                    <a v-if="userIsLeader && !programme.published" v-on:click="modals.confirmDeleteProgramme = 1">Delete Programme</a>
+                <a v-if="userIsLeader && !programme.published" v-on:click="modals.confirmDeleteProgramme = 1">Delete Programme</a>
                 </div>
             </div>
         </div>
@@ -1825,6 +1971,7 @@ const ProgrammeEditor = {
         <add-module 
             v-bind:showing.sync="modals.addModule"
             v-bind:candidateModules="candidateModules"
+            ref="addModule"
             v-on:submit="assignModule($event)"
         />
         <confirm-unassign-module
@@ -1892,6 +2039,11 @@ const ProgrammeEditor = {
             v-bind:showing.sync="modals.confirmDeleteProgramme"
             v-bind:programmeName="programme.name"
             v-on:submit="deleteProgramme()"
+        />
+        <edit-outcome
+            v-bind:showing.sync="modals.editOutcome"
+            v-bind:outcome="pendingEditOutcome"
+            v-on:submit="editOutcome($event.id, $event.text)"
         />
     </div>
     <div v-else>
@@ -2060,7 +2212,6 @@ const ModuleEditor = {
             })
         },
         assignPrerequisite: function(target){
-            this.modals.assignPrerequisite = 2;
             this.sendRequest("assignPrerequisite", {
                 module1: this.$route.params.id,
                 module2: target.id
@@ -2071,11 +2222,11 @@ const ModuleEditor = {
                     return this.getPrerequisites()
                 })
                 .then(() => {
-                    this.modals.assignPrerequisite = 0;
+                    target.state=2;
                 })
             })
             .catch(error => {
-                this.modals.assignPrerequisite = 0;
+                target.state=2;
                 this.alertError(error);
             })
         },
@@ -2383,7 +2534,7 @@ const CreateModule = {
                 name: "",
                 year: 1,
                 semester: 1,
-                credits: 15
+                credits: 7.5
             }
         }
     },
@@ -2434,18 +2585,18 @@ const CreateModule = {
               <div class="control">
                 <div class="select">
                   <select v-model="formData.credits">
+                    <option>7.5</option>
                     <option>15</option>
+                    <option>22.5</option>
                     <option>30</option>
-                    <option>45</option>
-                    <option>60</option>
                   </select>
                 </div>
               </div>
             </div>
           </section>
           <footer class="modal-card-foot">
-            <button class="button is-success" v-on:click="$emit('submit', formData)">Create</button>
-            <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            <button class="button is-success" v-on:click="$emit('submit', formData)" v-bind:disabled="showing==2" v-bind:class="{'is-loading':showing==2}">Create</button>
+            <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
           </footer>
         </div>
       </div>
@@ -2510,12 +2661,36 @@ const SignIn = {
     `
 }
 
+const Home = {
+    data: function(){
+        return {
+            user: null
+        }
+    },
+    created: function(){
+        firebase.auth().onAuthStateChanged(user => {
+            this.user = user;
+        })
+    },
+    template: `
+    <section class="hero is-medium is-dark">
+        <div class="hero-body">
+            <div class="container">
+                <h1 class="title is-1">ProgManSys</h1>
+                <h3 class="subtitle is-3">University <b>Prog</b>ramme <b>Man</b>agement <b>Sys</b>tem</h3>
+            </div>
+        </div>
+    </section>
+    `
+}
+
 const routes = [
     { path: '/programmes', component: ProgrammeList },
     { path: '/modules', component: ModuleList },
     { path: '/programmes/:id', component: ProgrammeEditor },
     { path: '/modules/:id', component: ModuleEditor },
     { path: '/signin', component: SignIn },
+    { path: '/', component: Home}
 ]
 const router = new VueRouter({
     routes
@@ -2574,7 +2749,7 @@ var app = new Vue({
             })
             .catch(error => {
                 this.modals.createProgramme = 0;
-                alertError(error)
+                this.alertError(error)
             })
         },
         createModule: function(name, year, semester, credits){
@@ -2591,7 +2766,7 @@ var app = new Vue({
             })
             .catch(error => {
                 this.modals.createModule = 0;
-                alertError(error)
+                this.alertError(error)
             })
         }
     },
@@ -2599,8 +2774,5 @@ var app = new Vue({
         firebase.auth().onAuthStateChanged(user => {
             this.user = user;
         })
-        if (ui.isPendingRedirect()) {
-            ui.start('#firebaseui-auth-container', uiConfig);
-        }
     }
 });

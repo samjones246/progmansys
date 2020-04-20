@@ -82,7 +82,7 @@
       <div id="firebaseui-auth-container"></div>
       <create-module
         v-bind:showing.sync="modals.createModule"
-        v-on:submit="createModule($event.name, parseInt($event.year), parseInt($event.semester), parseInt($event.credits))"
+        v-on:submit="createModule($event.name, parseInt($event.year), parseInt($event.semester), parseFloat($event.credits))"
       ></create-module>
       <create-programme
         v-bind:showing.sync="modals.createProgramme"
