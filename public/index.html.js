@@ -2064,6 +2064,7 @@ const ProgrammeEditor = {
 const ModuleEditor = {
     data: function(){
         return {
+            user: null,
             module: null,
             leader: null,
             prerequisites: [],
@@ -2072,6 +2073,7 @@ const ModuleEditor = {
             editable: true,
             pendingUnassignPrerequisite: null,
             pendingRemoveOutcome: null,
+            pendingEditOutcome: null,
             modals: {
                 addOutcome: 0,
                 removeOutcome: 0,
@@ -2082,7 +2084,8 @@ const ModuleEditor = {
                 changeCredits: 0,
                 assignPrerequisite: 0,
                 unassignPrerequisite: 0,
-                confirmDeleteModule: 0
+                confirmDeleteModule: 0,
+                editOutcome: 0
             }
         }
     },
@@ -2101,7 +2104,8 @@ const ModuleEditor = {
         'confirm-remove-outcome': ConfirmRemoveOutcome,
         'confirm-delete-module': ConfirmDeleteModule,
         'assign-prerequisite': AssignPrerequisite,
-        'confirm-unassign-prerequisite': ConfirmUnassignPrerequisite
+        'confirm-unassign-prerequisite': ConfirmUnassignPrerequisite,
+        'edit-outcome': EditOutcome
     },
     methods: {
         getModule: function(){
@@ -2353,6 +2357,24 @@ const ModuleEditor = {
                 this.modals.confirmDeleteModule = 0;
                 this.alertError(error);
             })
+        },
+        editOutcome: function(outcomeId, outcome){
+            this.modals.editOutcome = 2;
+            this.sendRequest("editModuleOutcome", {
+                module: this.$route.params.id,
+                outcomeId: outcomeId,
+                outcome: outcome
+            })
+            .then(response => {
+                this.getModule()
+                .then(() => {
+                    this.modals.editOutcome = 0;
+                });
+            })
+            .catch(error => {
+                this.modals.editOutcome = 0;
+                this.alertError(error);
+            })
         }
     },
     created: function(){
@@ -2412,7 +2434,13 @@ const ModuleEditor = {
                             <div class="content is-medium">
                                 <ol v-if="Object.keys(module.outcomes).length > 0">
                                     <li v-for="(o, i) in module.outcomes" v-bind:value="i">
-                                        {{ o }} <a v-if="userIsLeader && editable" v-on:click="()=>{pendingRemoveOutcome={'id':i,'text':o};modals.removeOutcome=1}"><i class="fas fa-minus-circle"></i></a>
+                                        {{ o }} 
+                                        <a v-if="userIsLeader && editable" v-on:click="()=>{pendingRemoveOutcome={'id':i,'text':o};modals.removeOutcome=1}">
+                                            <i class="fas fa-minus-circle"></i>
+                                        </a>
+                                        <a v-if="userIsLeader && editable" v-on:click="()=>{pendingEditOutcome={'id':i,'text':o};modals.editOutcome=1;}">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
                                     </li>
                                 </ol>
                                 <div v-else>
@@ -2510,6 +2538,11 @@ const ModuleEditor = {
             v-bind:showing.sync="modals.confirmDeleteModule"
             v-bind:moduleName="module.name"
             v-on:submit="deleteModule()"
+        />
+        <edit-outcome
+            v-bind:showing.sync="modals.editOutcome"
+            v-bind:outcome="pendingEditOutcome"
+            v-on:submit="editOutcome($event.id, $event.text)"
         />
     </div>
     <div v-else>

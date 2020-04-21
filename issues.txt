@@ -1,7 +1,7 @@
 Issues:
  - Some modals do not clear between uses 6
  - Cannot edit programme outcomes /
- - Cannot edit module outcomes 1
+ - Cannot edit module outcomes /
  - Programme outcomes box takes up a large amount of space /
  - No support for custom outcome IDs 4
  - No categorisation for outcomes 5
