@@ -2509,10 +2509,6 @@ exports.editProgrammeOutcome = functions.https.onRequest((req, res) => {
         })
         // GRD5 - Requesting user is an administrator
         .then(() => {
-            return admin.auth().verifyIdToken(idToken);
-        })
-        .then(decodedToken => {
-            uid = decodedToken.uid; 
             if(!programmeDoc.administrators.includes(uid)){
                 return Promise.reject(Error("Only a programme administrator can perform this action"));
             }else{
@@ -2543,6 +2539,94 @@ exports.editProgrammeOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(programmeDoc.outcomes);
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+        });
+    });
+});
+exports.editModuleOutcome = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const module = req.body.module;
+        const outcomeId = req.body.outcomeId;
+        const outcome = req.body.outcome;
+        var uid;
+        var moduleDoc;
+        var moduleRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("modules").doc(module).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                moduleDoc = snapshot.data();
+                moduleRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Outcome exists
+        .then(() => {
+            if(moduleDoc.outcomes.hasOwnProperty(outcomeId)){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme has no outcome with this ID"))
+            }
+        })
+        // GRD4 - New outcome is a string
+        .then(() => {
+            if(typeof outcome == 'string'){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Outcome must be a string"));
+            }
+        })
+        // GRD5 - Requesting user is module leader
+        .then(() => {
+            if(moduleDoc.leader == uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the module leader can perform this action"));
+            }
+        })
+        // GRD6 - The outcome is not already an outcome of the module
+        .then(() => {
+            for (element in moduleDoc.outcomes) {
+                if(moduleDoc.outcomes[element] === outcome){
+                    return Promise.reject(Error("This module has already been assigned an identical outcome"));
+                }
+            }
+            return Promise.resolve();
+        })
+        // GRD7 - Module is not a member of any published programme
+        .then(() => {
+            return firestore.collection('programmes').where("modules", "array-contains", module).get();
+        })
+        .then(snapshot => {
+            snapshot.docs.forEach(element => {
+                if(element.published){
+                    return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+                }
+            })
+            return Promise.resolve();
+        })
+        // ACT1 - Assign module outcome
+        .then(() => {
+            moduleDoc.outcomes[outcomeId] = outcome;
+            return moduleRef.update("outcomes."+outcomeId, outcome);
+        })
+        .then(result => {
+            res.send(moduleDoc.outcomes);
         })
         // If a guard failed, respond with the error
         .catch(error => {
