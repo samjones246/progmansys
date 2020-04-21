@@ -9,4 +9,4 @@ Issues:
  - Prerequisites must be assigned one at a time /
  - No module/programme descriptions 3
  - No search when assigning modules/prerequisites /
- - No 'loading' equivalent for setting module as core/optional 2
+ - No 'loading' equivalent for setting module as core/optional /

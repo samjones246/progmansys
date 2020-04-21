@@ -1409,6 +1409,7 @@ const ProgrammeEditor = {
     },
     methods: {
         toggleCore: function(module) {
+            module.isToggling = true;
             var endpoint = module.core ? "setOptional" : "setCore";
             this.sendRequest(endpoint, {
                 programme: this.$route.params.id,
@@ -1419,8 +1420,12 @@ const ProgrammeEditor = {
                .then(() => {
                    return this.getModules();
                })
+               .then(() => {
+                module.isToggling = false;
+               })
             })
             .catch(error => {
+                module.isToggling = false;
                 alert(error);
             })
         },
@@ -1550,6 +1555,7 @@ const ProgrammeEditor = {
                     var year = moduleDoc.year - 1;
                     var semester = moduleDoc.semester - 1;
                     moduleDoc.id = this.programme.modules[i];
+                    moduleDoc.isToggling = false;
                     if(this.programme.core.includes(moduleDoc.id)){
                         moduleDoc.core = true;
                         core[year][semester].push(moduleDoc)
@@ -1891,9 +1897,15 @@ const ProgrammeEditor = {
                                                     <li v-for="type in ['Core', 'Optional']" v-if="(type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]).length > 0">
                                                         <h3 class="title is-4">{{ type }}</h3>
                                                         <ul>    
-                                                            <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]">
-                                                                <h3 class="title is-4"><router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link> <a v-if="userIsAdmin && !programme.published" v-on:click="function(){pendingDelete = m;modals.confirmUnassignModule=1}"><i class="fas fa-minus-circle"></i></a></h3>
-                                                                <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
+                                                            <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]" :key="m.id">
+                                                                <h3 class="title is-4">
+                                                                    <router-link v-bind:to="'/modules/'+m.id">{{ m.name }}</router-link> 
+                                                                    <a v-if="userIsAdmin && !programme.published && !m.isToggling" v-on:click="function(){pendingDelete = m;modals.confirmUnassignModule=1}">
+                                                                        <i class="fas fa-minus-circle"></i>
+                                                                    </a>
+                                                                    <i v-if="m.isToggling" class="fas fa-circle-notch fa-spin"></i>
+                                                                </h3>
+                                                                <div class="subtitle is-6" v-if="userIsAdmin && !programme.published && !m.isToggling">
                                                                     <a v-on:click="toggleCore(m)">Mark as {{ type==='Core' ? 'optional' : 'core' }}</a>
                                                                 </div>
                                                             </li>

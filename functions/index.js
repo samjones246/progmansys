@@ -260,7 +260,7 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
         // Check user is module leader
         .then(decodedToken => {
             uid = decodedToken.uid;
-            if(!moduleDoc.leader == uid){
+            if(!moduleDoc.leader === uid){
                 return Promise.reject(Error("User not permitted to perform this action"));
             }else{
                 return Promise.resolve();
@@ -317,7 +317,7 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
         // Check user is programme leader
         .then(decodedToken => {
             uid = decodedToken.uid;
-            if(!programmeDoc.leader == uid){
+            if(!programmeDoc.leader === uid){
                 return Promise.reject(Error("User not permitted to perform this action"));
             }else{
                 return Promise.resolve();
@@ -329,7 +329,7 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
                 return Promise.reject(Error("Cannot delete a published programme"));
             }else{
                 return Promise.resolve();
-            };
+            }
         })
         // Delete programme
         .then(() => {
@@ -410,8 +410,8 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
                 delete programmeDoc.mapping[i][module]
             }
             return firestore.collection('programmes').doc(programme).update({
-                modules: programmeDoc.modules.filter((value, index, arr) => value!= module),
-                core: programmeDoc.core.filter((value, index, arr) => value!= module),
+                modules: programmeDoc.modules.filter((value, index, arr) => value!== module),
+                core: programmeDoc.core.filter((value, index, arr) => value!== module),
                 mapping: programmeDoc.mapping
             });
         })
@@ -464,7 +464,7 @@ exports.addAdministrator = functions.https.onRequest((req, res) => {
         })
         // GRD4 - Requesting user is programme leader
         .then(() => {
-            if(programmeDoc.leader == uid){
+            if(programmeDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("User is not permitted to perform this action"));
@@ -495,6 +495,7 @@ exports.addAdministrator = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(targetUid + " is now an administrator for "+programmeDoc.name);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -540,7 +541,7 @@ exports.removeAdministrator = functions.https.onRequest((req, res) => {
         })
         // GRD4 - Requesting user is programme leader
         .then(() => {
-            if(programmeDoc.leader == uid){
+            if(programmeDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("User is not permitted to perform this action"));
@@ -556,7 +557,7 @@ exports.removeAdministrator = functions.https.onRequest((req, res) => {
         })
         // GRD6 - Requesting user is not the target user
         .then(() => {
-            if(targetUid == uid){
+            if(targetUid === uid){
                 return Promise.reject(Error("Cannot remove self from administrators"));
             }else{
                 return Promise.resolve();
@@ -572,13 +573,14 @@ exports.removeAdministrator = functions.https.onRequest((req, res) => {
         })
         // ACT1 - Remove target user from administrators
         .then(() => {
-            programmeDoc.administrators = programmeDoc.administrators.filter((value, index, arr) => value!=targetUid);
+            programmeDoc.administrators = programmeDoc.administrators.filter((value, index, arr) => value!==targetUid);
             return programmeRef.update({
                 administrators: programmeDoc.administrators
             })
         })
         .then(result => {
             res.send(targetUid + " is no longer an administrator for " + programmeDoc.name);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -624,7 +626,7 @@ exports.transferProgrammeOwnership = functions.https.onRequest((req, res) => {
         })
         // GRD4 - Requesting user is programme leader
         .then(() => {
-            if(programmeDoc.leader == uid){
+            if(programmeDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the programme leader can perform this action"));
@@ -640,7 +642,7 @@ exports.transferProgrammeOwnership = functions.https.onRequest((req, res) => {
         })
         // GRD6 - Requesting user is not the target user
         .then(() => {
-            if(targetUid == uid){
+            if(targetUid === uid){
                 return Promise.reject(Error("Cannot transfer ownership to self"));
             }else{
                 return Promise.resolve();
@@ -662,6 +664,7 @@ exports.transferProgrammeOwnership = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send("Ownership of " + programmeDoc.name + " transferred from " + uid + " to " + targetUid);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -707,7 +710,7 @@ exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
         })
         // GRD4 - Requesting user is module leader
         .then(() => {
-            if(moduleDoc.leader == uid){
+            if(moduleDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -715,7 +718,7 @@ exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
         })
         // GRD5 - Requesting user is not the target user
         .then(() => {
-            if(targetUid == uid){
+            if(targetUid === uid){
                 return Promise.reject(Error("Cannot transfer ownership to self"));
             }else{
                 return Promise.resolve();
@@ -730,6 +733,7 @@ exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send("Ownership of " + moduleDoc.name + " transferred from " + uid + " to " + targetUid);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -768,7 +772,7 @@ exports.assignProgrammeOutcome = functions.https.onRequest((req, res) => {
         })
         // GRD3 - Outcome is a string
         .then(() => {
-            if(typeof outcome == 'string'){
+            if(typeof outcome === 'string'){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Outcome must be a string"));
@@ -818,6 +822,7 @@ exports.assignProgrammeOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(programmeDoc.outcomes);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -856,7 +861,7 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
         })
         // GRD3 - The outcome is a module outcome
         .then(() => {
-            if(typeof outcome == 'string'){
+            if(typeof outcome === 'string'){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Outcome must be a string"));
@@ -864,7 +869,7 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
         })
         // GRD4 - Requesting user is module leader
         .then(() => {
-            if(moduleDoc.leader == uid){
+            if(moduleDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -907,6 +912,7 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(moduleDoc.outcomes);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -978,6 +984,7 @@ exports.unassignProgrammeOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(programmeDoc.outcomes);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -1068,6 +1075,7 @@ exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(moduleDoc.outcomes);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -1191,6 +1199,7 @@ exports.mapOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(programmeDoc.mapping);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
@@ -1284,7 +1293,7 @@ exports.unmapOutcome = functions.https.onRequest((req, res) => {
                     return Promise.resolve();
                 }
             }
-            Promise.reject(Error("Mapping does not exist"));
+            return Promise.reject(Error("Mapping does not exist"));
         })
         // GRD11 - Programme is not published
         .then(() => {
@@ -1358,7 +1367,7 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
         })
         // GRD44 - Requesting user is module leader of module 1
         .then(() => {
-            if(module1Doc.leader == uid){
+            if(module1Doc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -1374,7 +1383,7 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
         })
         // GRD48 - Module 1 is not module 2
         .then(() => {
-            if(module1 == module2){
+            if(module1 === module2){
                 return Promise.reject(Error("Cannot assign a module as a prerequisite of itself"));
             }else{
                 return Promise.resolve();
@@ -1418,6 +1427,7 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -1465,7 +1475,7 @@ exports.unassignPrerequisite = functions.https.onRequest((req, res) => {
         })
         // GRD44 - Requesting user is module leader of module 1
         .then(() => {
-            if(module1Doc.leader == uid){
+            if(module1Doc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -1505,6 +1515,7 @@ exports.unassignPrerequisite = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -1539,7 +1550,7 @@ exports.changeSemester = functions.https.onRequest((req, res) => {
         })
         // GRD3 - Requesting user is module leader
         .then(() => {
-            if(moduleDoc.leader == uid){
+            if(moduleDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -1620,10 +1631,12 @@ exports.changeSemester = functions.https.onRequest((req, res) => {
         })
         .then(snapshot => {
             res.send(snapshot.data());
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -1658,7 +1671,7 @@ exports.changeYear = functions.https.onRequest((req, res) => {
         })
         // GRD3 - Requesting user is module leader
         .then(() => {
-            if(moduleDoc.leader == uid){
+            if(moduleDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -1739,10 +1752,12 @@ exports.changeYear = functions.https.onRequest((req, res) => {
         })
         .then(snapshot => {
             res.send(snapshot.data());
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -1777,7 +1792,7 @@ exports.changeCredits = functions.https.onRequest((req, res) => {
         })
         // GRD3 - Requesting user is module leader
         .then(() => {
-            if(moduleDoc.leader == uid){
+            if(moduleDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -1820,10 +1835,12 @@ exports.changeCredits = functions.https.onRequest((req, res) => {
         })
         .then(snapshot => {
             res.send(snapshot.data());
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -1919,10 +1936,12 @@ exports.changeDuration = functions.https.onRequest((req, res) => {
         })
         .then(snapshot => {
             res.send(snapshot.data());
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2111,6 +2130,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2172,6 +2192,7 @@ exports.unpublishProgramme = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2261,6 +2282,7 @@ exports.setCore = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2350,6 +2372,7 @@ exports.setOptional = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2405,6 +2428,7 @@ exports.renameProgramme = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2459,6 +2483,7 @@ exports.renameModule = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2501,7 +2526,7 @@ exports.editProgrammeOutcome = functions.https.onRequest((req, res) => {
         })
         // GRD4 - New outcome is a string
         .then(() => {
-            if(typeof outcome == 'string'){
+            if(typeof outcome === 'string'){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Outcome must be a string"));
@@ -2539,10 +2564,12 @@ exports.editProgrammeOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(programmeDoc.outcomes);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2585,7 +2612,7 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
         })
         // GRD4 - New outcome is a string
         .then(() => {
-            if(typeof outcome == 'string'){
+            if(typeof outcome === 'string'){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Outcome must be a string"));
@@ -2593,7 +2620,7 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
         })
         // GRD5 - Requesting user is module leader
         .then(() => {
-            if(moduleDoc.leader == uid){
+            if(moduleDoc.leader === uid){
                 return Promise.resolve();
             }else{
                 return Promise.reject(Error("Only the module leader can perform this action"));
@@ -2627,10 +2654,12 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
         })
         .then(result => {
             res.send(moduleDoc.outcomes);
+            return;
         })
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
