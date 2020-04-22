@@ -572,6 +572,43 @@ const ConfirmRemoveOutcome = {
         </div>
         `
 }
+
+const SetDescription = {
+    data: function(){
+        return {
+            pending: ""
+        }
+    },
+    props: {
+        showing: Number,
+        current: String
+    },
+    watch: {
+        showing: function(){
+            if(this.showing==1){
+                this.pending = this.current;
+            }
+        }
+    },
+    template:`
+    <div class="modal" v-bind:class="{'is-active': showing}">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Edit Description</p>
+        </header>
+        <section class="modal-card-body">
+            <textarea class="textarea" placeholder="Description" v-model="pending"></textarea>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-success" v-on:click="$emit('submit', pending)" v-bind:disabled="pending === current || showing==2" v-bind:class="{'is-loading':showing==2}">Submit</button>
+            <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
+        </footer>
+        </div>
+    </div>
+    `
+}
+
 const MapOutcome = {
     data: function(){
         return {
@@ -1372,7 +1409,8 @@ const ProgrammeEditor = {
                 confirmPublishProgramme: 0,
                 confirmUnpublishProgramme: 0,
                 confirmDeleteProgramme: 0,
-                editOutcome: 0
+                editOutcome: 0,
+                setDescription: 0
             }
         }
     },
@@ -1405,7 +1443,8 @@ const ProgrammeEditor = {
         'confirm-publish-programme': ConfirmPublishProgramme,
         'confirm-unpublish-programme': ConfirmUnpublishProgramme,
         'confirm-delete-programme': ConfirmDeleteProgramme,
-        'edit-outcome': EditOutcome
+        'edit-outcome': EditOutcome,
+        'set-description': SetDescription
     },
     methods: {
         toggleCore: function(module) {
@@ -1823,6 +1862,23 @@ const ProgrammeEditor = {
                 this.modals.editOutcome = 0;
                 this.alertError(error)
             })
+        },
+        setDescription: function(description){
+            this.modals.setDescription = 2;
+            this.sendRequest("setProgrammeDescription", {
+                programme: this.$route.params.id,
+                description: description
+            })
+            .then(response => {
+                this.getProgramme()
+                .then(() => {
+                    this.modals.setDescription = 0;
+                })
+            })
+            .catch(error => {
+                this.modals.setDescription = 0;
+                this.alertError(error)
+            })
         }
     },
     created: function() {
@@ -1854,9 +1910,9 @@ const ProgrammeEditor = {
                                 <h1 class="title">
                                     {{ programme.name }} <a v-if="userIsLeader && !programme.published" v-on:click="modals.renameProgramme=1" title="Rename Programme"><i class="fas fa-edit"></i></a>
                                 </h1>
-                                <h2 class="subtitle">
+                                <h1 class="subtitle">
                                     Led by {{ leader.displayName }} <a v-if="userIsLeader && !programme.published" title="Transfer ownership" v-on:click="modals.transferOwnership=1"><i class="fas fa-edit"></i></a>
-                                </h2>
+                                </h1>
                             </div>
                         </div>
                         <div class="level-right">
@@ -1875,6 +1931,13 @@ const ProgrammeEditor = {
                             </div>
                         </div>
                     </nav>
+                    <div class="content is-medium">
+                        <p>
+                            <span v-if="programme.description.length === 0">No description set</span>
+                            <span v-else>{{ programme.description }}</span>
+                            <a v-if="userIsAdmin && !programme.published" v-on:click="modals.setDescription=1"><i class="fas fa-edit"></i></a>
+                        </p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -2057,6 +2120,11 @@ const ProgrammeEditor = {
             v-bind:outcome="pendingEditOutcome"
             v-on:submit="editOutcome($event.id, $event.text)"
         />
+        <set-description
+            v-bind:showing.sync="modals.setDescription"
+            v-bind:current="programme.description"
+            v-on:submit="setDescription($event)"
+        />
     </div>
     <div v-else>
         <br>
@@ -2097,7 +2165,8 @@ const ModuleEditor = {
                 assignPrerequisite: 0,
                 unassignPrerequisite: 0,
                 confirmDeleteModule: 0,
-                editOutcome: 0
+                editOutcome: 0,
+                setDescription: 0,
             }
         }
     },
@@ -2117,13 +2186,17 @@ const ModuleEditor = {
         'confirm-delete-module': ConfirmDeleteModule,
         'assign-prerequisite': AssignPrerequisite,
         'confirm-unassign-prerequisite': ConfirmUnassignPrerequisite,
-        'edit-outcome': EditOutcome
+        'edit-outcome': EditOutcome,
+        'set-description': SetDescription
     },
     methods: {
         getModule: function(){
             return firebase.firestore().collection("modules").doc(this.$route.params.id).get()
             .then(snapshot => {
                 this.module = snapshot.data();
+                if(!this.module.description){
+                    this.module.description = ""
+                }
             })
         },
         getLeader: function(){
@@ -2387,6 +2460,22 @@ const ModuleEditor = {
                 this.modals.editOutcome = 0;
                 this.alertError(error);
             })
+        },
+        setDescription: function(description){
+            this.modals.setDescription = 2;
+            this.sendRequest("setModuleDescription", {
+                module: this.$route.params.id,
+                description
+            })
+            .then(response => {
+                this.getModule()
+                .then(() => {
+                    this.modals.setDescription = 0;
+                })
+            })
+            .catch(error => {
+                this.modals.setDescription = 0;
+            })
         }
     },
     created: function(){
@@ -2428,6 +2517,17 @@ const ModuleEditor = {
                             </div>
                         </div>
                     </nav>
+                    <div class="content is-medium">
+                        <p>
+                            <span v-if="module.description.length">
+                                {{ module.description }}
+                            </span>
+                            <span v-else>
+                                No Description Set
+                            </span>
+                            <a v-if="userIsLeader && editable" v-on:click="modals.setDescription = 1"><i class="fas fa-edit"></i></a>
+                        </p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -2555,6 +2655,11 @@ const ModuleEditor = {
             v-bind:showing.sync="modals.editOutcome"
             v-bind:outcome="pendingEditOutcome"
             v-on:submit="editOutcome($event.id, $event.text)"
+        />
+        <set-description
+            v-bind:showing.sync="modals.setDescription"
+            v-bind:current="module.description"
+            v-on:submit="setDescription($event)"
         />
     </div>
     <div v-else>

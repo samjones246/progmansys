@@ -2682,7 +2682,7 @@ exports.setProgrammeDescription = functions.https.onRequest((req, res) => {
         })
         // GRD2 - Programme exists
         .then(() => {
-            return firestore.collection("programmes").doc(programmes).get();
+            return firestore.collection("programmes").doc(programme).get();
         })
         .then(snapshot => {
             if(snapshot.exists){
@@ -2741,7 +2741,7 @@ exports.setModuleDescription = functions.https.onRequest((req, res) => {
         })
         // GRD2 - Module exists
         .then(() => {
-            return firestore.collection("modules").doc(modules).get();
+            return firestore.collection("modules").doc(module).get();
         })
         .then(snapshot => {
             if(snapshot.exists){
