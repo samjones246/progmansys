@@ -2537,24 +2537,25 @@ const ModuleEditor = {
         </div>
         <div class="tile is-ancestor">
             <div class="tile is-parent is-vertical">
-                <div class="tile is-parent">
+                <div class="tile is-parent is-vertical">
                     <div class="tile is-parent">
                         <div class="tile is-child is-warning notification">
                             <h1 class="title">
                                 Learning Outcomes <a v-if="userIsLeader" v-on:click="modals.addOutcome=1"><i class="fas fa-plus-circle"></i></a>
                             </h1>
                             <div class="content is-medium">
-                                <ol v-if="Object.keys(module.outcomes).length > 0">
-                                    <li v-for="(o, i) in module.outcomes" v-bind:value="i">
-                                        {{ o }} 
-                                        <a v-if="userIsLeader && editable" v-on:click="()=>{pendingRemoveOutcome={'id':i,'text':o};modals.removeOutcome=1}">
-                                            <i class="fas fa-minus-circle"></i>
-                                        </a>
-                                        <a v-if="userIsLeader && editable" v-on:click="()=>{pendingEditOutcome={'id':i,'text':o};modals.editOutcome=1;}">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </li>
-                                </ol>
+                                <div v-if="Object.keys(module.outcomes).length > 0">
+                                    <div v-for="category in module.outcomes">
+                                        <h1 class="title is-4">{{ category.name }} <a><i class="fas fa-plus-circle"></i></a> <a><i class="fas fa-minus-circle"></i></a> <a><i class="fas fa-edit"></i></a></h1>
+                                        <p>{{ category.context }}</p> 
+                                        <ol>
+                                            <li v-for="(outcome, id) in category.outcomes" v-bind:value="id">
+                                                {{ outcome }}
+                                            </li>
+                                        </ol>
+                                        <br/>
+                                    </div>
+                                </div>
                                 <div v-else>
                                     <p>No learning outcomes assigned</p>
                                 </div>
