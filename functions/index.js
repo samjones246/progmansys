@@ -60,7 +60,8 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
                 core: [],
                 outcomes: [],
                 mapping: {},
-                published: false
+                published: false,
+                description: ""
             });
         }).then(documentRef => {
             return documentRef.get();
@@ -129,7 +130,8 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
                 year: year,
                 credits: credits,
                 outcomes: {},
-                prerequisites: []
+                prerequisites: [],
+                description: ""
             });
         })
         .then(documentRef => {
@@ -2589,7 +2591,7 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
             uid = decodedToken.uid;
             return;
         })
-        // GRD2 - Programme exists
+        // GRD2 - Module exists
         .then(() => {
             return firestore.collection("modules").doc(module).get();
         })
@@ -2599,7 +2601,7 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
                 moduleRef = snapshot.ref;
                 return Promise.resolve();
             }else{
-                return Promise.reject(Error("Programme not found"));
+                return Promise.reject(Error("Module not found"));
             }
         })
         // GRD3 - Outcome exists
@@ -2607,7 +2609,7 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
             if(moduleDoc.outcomes.hasOwnProperty(outcomeId)){
                 return Promise.resolve();
             }else{
-                return Promise.reject(Error("Programme has no outcome with this ID"))
+                return Promise.reject(Error("Module has no outcome with this ID"))
             }
         })
         // GRD4 - New outcome is a string
@@ -2663,6 +2665,124 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
         });
     });
 });
+exports.setProgrammeDescription = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const programme = req.body.programme;
+        const description = req.body.description;
+        var uid;
+        var programmeDoc;
+        var programmeRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("programmes").doc(programmes).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                programmeDoc = snapshot.data();
+                programmeRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Requesting user is an administrator
+        .then(() => {
+            if(!programmeDoc.administrators.includes(uid)){
+                return Promise.reject(Error("Only a programme administrator can perform this action"));
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // GRD4 - Description is a string
+        .then(() => {
+            if(typeof description === 'string'){
+                return Promise.resolve()
+            }else{
+                return Promise.reject(Error("Description must be a string"))
+            }
+        })
+        // ACT1 - Set description
+        .then(() => {
+            return programmeRef.update('description', description)
+        })
+        .then(result => {
+            res.send("Programme description updated");
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+            return;
+        });
+    })
+})
+exports.setModuleDescription = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const module = req.body.module;
+        const description = req.body.description;
+        var uid;
+        var moduleDoc;
+        var moduleRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Module exists
+        .then(() => {
+            return firestore.collection("modules").doc(modules).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                moduleDoc = snapshot.data();
+                moduleRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Module not found"));
+            }
+        })
+        // GRD3 - Requesting user is module leader
+        .then(() => {
+            if(!moduleDoc.leader === uid){
+                return Promise.reject(Error("Only the module leader can perform this action"));
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // GRD4 - Description is a string
+        .then(() => {
+            if(typeof description === 'string'){
+                return Promise.resolve()
+            }else{
+                return Promise.reject(Error("Description must be a string"))
+            }
+        })
+        // ACT1 - Set description
+        .then(() => {
+            return moduleRef.update('description', description)
+        })
+        .then(result => {
+            res.send("Module description updated");
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+            return;
+        });
+    })
+})
 
 // Helper functions, will not affect system state
 exports.getUser = functions.https.onRequest((req, res) => {
