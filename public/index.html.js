@@ -2715,7 +2715,8 @@ const CreateModule = {
         }
     },
     props: {
-        showing: Number
+        showing: Number,
+        error: Number
     },
     template: `
     <div id="create-module" class="modal" v-bind:class="{'is-active': showing}">
@@ -2723,14 +2724,14 @@ const CreateModule = {
         <div class="modal-card">
           <header class="modal-card-head">
             <p class="modal-card-title">Create Module</p>
-            <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
           </header>
           <section class="modal-card-body">
             <div class="field">
               <label class="label">Name: </label>
               <div class="control">
-                <input class="input" type="text" placeholder="EXMP1001 Example" v-model="formData.name">
+                <input class="input" v-bind:class="{'is-danger':error===1}" type="text" placeholder="EXMP1001 Example" v-model="formData.name">
               </div>
+              <p class="help is-danger" v-if="error===1">Module name is already taken</p>
             </div>
             <div class="field">
               <label class="label">Year: </label>
@@ -2788,7 +2789,8 @@ const CreateProgramme = {
         }
     },
     props: {
-        showing: Number
+        showing: Number,
+        error: Number
     },
     template: `
     <div id="create-programme" class="modal" v-bind:class="{'is-active': showing}">
@@ -2796,14 +2798,14 @@ const CreateProgramme = {
         <div class="modal-card">
           <header class="modal-card-head">
             <p class="modal-card-title">Create Programme</p>
-            <button class="delete" aria-label="close" v-on:click="$emit('update:showing', false)"></button>
           </header>
           <section class="modal-card-body">
             <div class="field">
               <label class="label">Name: </label>
               <div class="control">
-                <input class="input" type="text" placeholder="BSc Something" v-model="formData.name">
+                <input class="input" v-bind:class="{'is-danger':error===1}" type="text" placeholder="BSc Something" v-model="formData.name">
               </div>
+              <p class="help is-danger" v-if="error===1">Programme name is already taken</p>
             </div>
             <div class="field">
               <label class="label">Duration: </label>
@@ -2820,8 +2822,8 @@ const CreateProgramme = {
             </div>
           </section>
           <footer class="modal-card-foot">
-            <button class="button is-success" v-on:click="$emit('submit', formData)">Create</button>
-            <button class="button" v-on:click="$emit('update:showing', false)">Cancel</button>
+            <button class="button is-success" v-on:click="$emit('submit', formData)" v-bind:disabled="showing===2" v-bind:class="{'is-loading':showing===2}">Create</button>
+            <button class="button" v-bind:disabled="showing===2" v-on:click="$emit('update:showing', 0)">Cancel</button>
           </footer>
         </div>
       </div>
@@ -2881,6 +2883,8 @@ var app = new Vue({
     },
     data: {
         user: null,
+        moduleNameTaken: 0,
+        programmeNameTaken: 0,
         modals: {
             createProgramme: 0,
             createModule: 0,
@@ -2924,8 +2928,8 @@ var app = new Vue({
                 window.location.assign("/#/programmes/"+response.data.id)
             })
             .catch(error => {
-                this.modals.createProgramme = 0;
-                this.alertError(error)
+                this.modals.createProgramme = 1;
+                this.programmeNameTaken = 1;
             })
         },
         createModule: function(name, year, semester, credits){
@@ -2941,8 +2945,8 @@ var app = new Vue({
                 window.location.assign("/#/modules/"+response.data.id)
             })
             .catch(error => {
-                this.modals.createModule = 0;
-                this.alertError(error)
+                this.modals.createModule = 1;
+                this.moduleNameTaken = 1;
             })
         }
     },
