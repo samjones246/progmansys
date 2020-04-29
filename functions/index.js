@@ -707,7 +707,7 @@ exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
                 moduleRef = snapshot.ref;
                 return Promise.resolve();
             }else{
-                return Promise.reject(Error("module not found"));
+                return Promise.reject(Error("Module not found"));
             }
         })
         // GRD4 - Requesting user is module leader
@@ -740,6 +740,7 @@ exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
         // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
+            return;
         });
     });
 });
@@ -2416,6 +2417,14 @@ exports.renameProgramme = functions.https.onRequest((req, res) => {
                 return Promise.reject(Error("Only the programme leader can perform this action"));
             }
         })
+        // GRD4 - Programme is not published
+        .then(() => {
+            if(programme.published){
+                return Promise.reject(Error("Cannot edit a published programme"))
+            }else{
+                return Promise.resolve();
+            }
+        })
         // ACT1 - Rename programme
         .then(() => {
             return programmeRef.update("name", name);
@@ -2434,7 +2443,6 @@ exports.renameProgramme = functions.https.onRequest((req, res) => {
         });
     });
 });
-
 exports.renameModule = functions.https.onRequest((req, res) => {
     cors(req, res, () => {
         // Setup variables
@@ -2709,6 +2717,14 @@ exports.setProgrammeDescription = functions.https.onRequest((req, res) => {
                 return Promise.reject(Error("Description must be a string"))
             }
         })
+        // GRD5 - Programme is not published
+        .then(() => {
+            if(programme.published){
+                return Promise.reject(Error("Cannot edit a published programme"))
+            }else{
+                return Promise.resolve();
+            }
+        })
         // ACT1 - Set description
         .then(() => {
             return programmeRef.update('description', description)
@@ -2781,6 +2797,243 @@ exports.setModuleDescription = functions.https.onRequest((req, res) => {
             res.status(400).send(error.message);
             return;
         });
+    })
+})
+exports.createModuleOutcomeCategory = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const module = req.body.module;
+        const categoryName = req.body.categoryName;
+        var uid;
+        var moduleDoc;
+        var moduleRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Module exists
+        .then(() => {
+            return firestore.collection("modules").doc(module).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                moduleDoc = snapshot.data();
+                moduleRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Module not found"));
+            }
+        })
+        // GRD3 - Requesting user is module leader
+        .then(() => {
+            if(moduleDoc.leader === uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the module leader can perform this action"));
+            }
+        })
+        // GRD4 - Module is not part of any published programme
+        .then(() => {
+            return firestore.collection('programmes').where("modules", "array-contains", module).get();
+        })
+        .then(snapshot => {
+            snapshot.docs.forEach(element => {
+                if(element.published){
+                    return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+                }
+            })
+            return Promise.resolve();
+        })
+        // ACT1 - Create module outcome category
+        .then(() => {
+            return moduleRef.update("outcomes", firebase.firestore().FieldValue.arrayUnion({
+                name: categoryName,
+                context: "",
+                outcomes: {}
+            }))
+        })
+        .then(result => {
+            res.send("Module outcome category created successfully")
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+            return;
+        });
+    })
+})
+exports.createProgrammeOutcomeCategory = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const programme = req.body.programme;
+        const categoryName = req.body.categoryName;
+        var uid;
+        var programmeDoc;
+        var programmeRef;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection("programmes").doc(programme).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                programmeDoc = snapshot.data();
+                programmeRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Programme not found"));
+            }
+        })
+        // GRD3 - Requesting user is programme leader
+        .then(() => {
+            if(programmeDoc.leader === uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the programme leader can perform this action"));
+            }
+        })
+        // GRD4 - Programme is not published
+        .then(() => {
+            if(programme.published){
+                return Promise.reject(Error("Cannot edit a published programme"))
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // ACT1 - Create programme outcome category
+        .then(() => {
+            return programmeRef.update("outcomes", firebase.firestore().FieldValue.arrayUnion({
+                name: categoryName,
+                context: "",
+                outcomes: {}
+            }))
+        })
+        .then(result => {
+            res.send("Programme outcome category created successfully")
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+            return;
+        });
+    })
+})
+exports.removeModuleOutcomeCategory = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+        // Setup variables
+        const idToken = req.body.idToken;
+        const module = req.body.module;
+        const categoryName = req.body.categoryName;
+        var uid;
+        var moduleDoc;
+        var moduleRef;
+        var target;
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Module exists
+        .then(() => {
+            return firestore.collection("modules").doc(module).get();
+        })
+        .then(snapshot => {
+            if(snapshot.exists){
+                moduleDoc = snapshot.data();
+                moduleRef = snapshot.ref;
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Module not found"));
+            }
+        })
+        // GRD3 - Requesting user is module leader
+        .then(() => {
+            if(moduleDoc.leader === uid){
+                return Promise.resolve();
+            }else{
+                return Promise.reject(Error("Only the module leader can perform this action"));
+            }
+        })
+        // GRD4 - Module outcome category exists
+        .then(() => {
+            for(category of moduleDoc.outcomes){
+                if(category.name === categoryName){
+                    return Promise.resolve();
+                    target = category;
+                }
+            }
+            return Promise.reject(Error("Outcome category does not exist"))
+        })
+        // GRD5 - Module is not a member of any published programme
+        .then(() => {
+            return firestore.collection('programmes').where("modules", "array-contains", module).get();
+        })
+        .then(snapshot => {
+            snapshot.docs.forEach(element => {
+                if(element.published){
+                    return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+                }
+            })
+            return Promise.resolve();
+        })
+        // ACT1&2 - Remove module outcome category, remove all mappings from outcomes in this category
+        .then(() => {
+            var batch = firestore.batch()
+            for(document of programmes) {
+                for(outcomeId in target.outcomes){
+                    var mapping = document.data().mapping;
+                    for (programmeOutcome in mapping){
+                        if(mapping[programmeOutcome][module]){
+                            batch.update(document.ref, "mapping."+programmeOutcome+"."+module, FieldValue.arrayRemove(outcomeId));
+                        }
+                    }
+                }
+            }
+            var batch = firestore.batch()
+            batch.update(moduleRef, )
+            return moduleRef.update("outcomes", firebase.firestore().FieldValue.arrayRemove(target))
+        })
+        .then(result => {
+            res.send("Module outcome category created removed")
+            return;
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
+            res.status(400).send(error.message);
+            return;
+        });
+    })
+})
+exports.removeProgrammeOutcomeCategory = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+    })
+})
+exports.editModuleOutcomeCategory = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+    })
+})
+exports.editProgrammeOutcomeCategory = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+    })
+})
+exports.editModuleOutcomeContext = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
+    })
+})
+exports.editProgrammeOutcomeContext = functions.https.onRequest((req, res) => {
+    cors(req, res, () => {
     })
 })
 

@@ -1374,6 +1374,34 @@ const ConfirmDeleteModule = {
     </div>
     `
 }
+const CreateOutcomeCategory = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
+const RemoveOutcomeCategory = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
+const RenameOutcomeCategory = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
+const EditContext = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
 const ProgrammeEditor = {
     data: function() {
         return {
