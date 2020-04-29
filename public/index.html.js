@@ -1374,6 +1374,34 @@ const ConfirmDeleteModule = {
     </div>
     `
 }
+const CreateOutcomeCategory = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
+const RemoveOutcomeCategory = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
+const RenameOutcomeCategory = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
+const EditContext = {
+    props: {
+        showing: Number
+    },
+    template: `
+    `
+}
 const ProgrammeEditor = {
     data: function() {
         return {
@@ -2545,16 +2573,13 @@ const ModuleEditor = {
                             </h1>
                             <div class="content is-medium">
                                 <div v-if="Object.keys(module.outcomes).length > 0">
-                                    <div v-for="category in module.outcomes">
-                                        <h1 class="title is-4">{{ category.name }} <a><i class="fas fa-plus-circle"></i></a> <a><i class="fas fa-minus-circle"></i></a> <a><i class="fas fa-edit"></i></a></h1>
-                                        <p>{{ category.context }}</p> 
-                                        <ol>
-                                            <li v-for="(outcome, id) in category.outcomes" v-bind:value="id">
-                                                {{ outcome }}
-                                            </li>
-                                        </ol>
-                                        <br/>
-                                    </div>
+                                    <ol>
+                                        <li v-for="(outcome, id) in module.outcomes" v-bind:value="id">
+                                            {{ outcome }} 
+                                            <a v-if="userIsLeader && editable" v-on:click="()=>{modals.editOutcome=1;pendingEditOutcome={'id':id,'text':outcome}}"><i class="fas fa-edit"></i></a>
+                                            <a v-if="userIsLeader && editable" v-on:click="()=>{modals.removeOutcome=1;pendingRemoveOutcome={'id':id,'text':outcome}}"><i class="fas fa-minus-circle"></i></a>
+                                        </li>
+                                    </ol>
                                 </div>
                                 <div v-else>
                                     <p>No learning outcomes assigned</p>
