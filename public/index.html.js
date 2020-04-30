@@ -483,7 +483,8 @@ const RenameProgramme = {
 const AddOutcome = {
     data: function(){
         return {
-            pending: ""
+            pending: "",
+            category: "A"
         }
     },
     props: {
@@ -497,10 +498,21 @@ const AddOutcome = {
             <p class="modal-card-title">Add Learning Outcome</p>
         </header>
         <section class="modal-card-body">
-            <input class="input" type="text" placeholder="Learning outcome" v-model="pending">
+        <label class="label">
+            Category: 
+            <div class="select">
+                <select v-model="category">
+                    <option value="A">Knowledge and Understanding</option>
+                    <option value="B">Subject Specific Intellectual and Research Skills</option>
+                    <option value="C">Transferable and Generic Skills</option>
+                    <option value="D">Subject Specific Practical Skills</option>
+                </select>
+            </div>
+        </label>
+            <textarea class="textarea" placeholder="Learning outcome" v-model="pending"></textarea>
         </section>
         <footer class="modal-card-foot">
-            <button class="button is-success" v-on:click="$emit('submit', pending)" v-bind:disabled="pending.length==0 || showing==2" v-bind:class="{'is-loading':showing==2}">Submit</button>
+            <button class="button is-success" v-on:click="$emit('submit', {'text':pending, 'category':category})" v-bind:disabled="pending.length==0 || showing==2" v-bind:class="{'is-loading':showing==2}">Submit</button>
             <button class="button" v-bind:disabled="showing==2" v-on:click="$emit('update:showing', 0)">Cancel</button>
         </footer>
         </div>
@@ -1414,7 +1426,7 @@ const ProgrammeEditor = {
             years: [],
             user: null,
             pendingDelete: null,
-            pendingDeleteOutcome: null,
+            pendingRemoveOutcome: null,
             pendingEditOutcome: null,
             pendingUnmap: null,
             pendingRemoveAdmin: null,
@@ -1439,7 +1451,29 @@ const ProgrammeEditor = {
                 confirmDeleteProgramme: 0,
                 editOutcome: 0,
                 setDescription: 0
-            }
+            },
+            categories: [
+                {
+                    title: "Knowledge and understanding",
+                    context: "Having successfully completed this module, you will be able to demonstrate knowledge and understanding of:",
+                    code: "A"
+                },
+                {
+                    title: "Subject Specific Intellectual and Research Skills",
+                    context: "Having successfully completed this module you will be able to:",
+                    code: "B"
+                },
+                {
+                    title: "Transferable and Generic Skills",
+                    context: "Having successfully completed this module you will be able to:",
+                    code: "C"
+                },
+                {
+                    title: "Subject Specific Practical Skills",
+                    context: "Having successfully completed this module you will be able to:",
+                    code: "D"
+                }
+            ]
         }
     },
     computed: {
@@ -1475,6 +1509,18 @@ const ProgrammeEditor = {
         'set-description': SetDescription
     },
     methods: {
+        categoryOutcomes: function(code){
+            var out = null;
+            for(id in this.programme.outcomes){
+                if(id[0] === code){
+                    if(out === null){
+                        out = {}
+                    }
+                    out[id] = this.programme.outcomes[id]
+                }
+            }
+            return out;
+        },
         toggleCore: function(module) {
             module.isToggling = true;
             var endpoint = module.core ? "setOptional" : "setCore";
@@ -1660,7 +1706,8 @@ const ProgrammeEditor = {
             this.modals.addOutcome = 2;
             this.sendRequest("assignProgrammeOutcome", {
                 programme: this.$route.params.id,
-                outcome: outcome
+                outcome: outcome.text,
+                category: outcome.category
             })
             .then(response => {
                 this.getProgramme()
@@ -1682,11 +1729,11 @@ const ProgrammeEditor = {
             .then(response => {
                 this.getProgramme()
                 .then(()=>{
-                    this.pendingDeleteOutcome = null;
+                    this.pendingRemoveOutcome = null;
                     this.modals.removeOutcome = 0;
                 })
             }).catch(error => {
-                this.pendingDeleteOutcome = null;
+                this.pendingRemoveOutcome = null;
                 this.modals.removeOutcome = 0;
                 alert(error);
             })
@@ -2020,30 +2067,36 @@ const ProgrammeEditor = {
                                 Learning Outcomes <a v-if="userIsAdmin && !programme.published" v-on:click="modals.addOutcome=1"><i class="fas fa-plus-circle"></i></a>
                             </h1>
                             <div class="content is-medium">
-                                <ol>
-                                    <li v-for="(o, i) in programme.outcomes" v-bind:value="i">
-                                        {{ o }} 
-                                        <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingDeleteOutcome = {'id':i,'text':o};modals.removeOutcome=1}">
-                                            <i class="fas fa-minus-circle"></i>
-                                        </a>
-                                        <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingEditOutcome = {'id':i,'text':o};modals.editOutcome=1}">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
-                                            <a v-on:click="()=>{pendingMapOutcome = i;modals.mapOutcome=1}">Map module outcome</a>
-                                        </div>
-                                        <ul>
-                                            <li v-for="(m, j) in programme.mapping[i]" v-if="programme.mapping[i][j].length > 0">
-                                                {{ getModuleById(j).name }}
-                                                <ol>
-                                                    <li v-for="o2 in programme.mapping[i][j]" v-bind:value="o2">
-                                                        {{ getModuleById(j).outcomes[o2] }} <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingUnmap={'module':getModuleById(j),'moduleOutcome': o2,'programmeOutcome': i, 'programmeOutcomeText': o};modals.unmapOutcome=1}"><i class="fas fa-minus-circle"></i></a>
+                                <div v-if="Object.keys(programme.outcomes).length">
+                                    <div v-for="category in categories" v-if="categoryOutcomes(category.code)">
+                                        <h2 class="title is-4">{{ category.title }}</h2>
+                                        <p>{{ category.context }}</p>
+                                        <div class="outer">
+                                            <div class="inner" v-for="(outcome, id) in categoryOutcomes(category.code)" :value="id">
+                                                {{ outcome }}
+                                                <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{modals.editOutcome=1;pendingEditOutcome={'id':id,'text':outcome}}"><i class="fas fa-edit"></i></a>
+                                                <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{modals.removeOutcome=1;pendingRemoveOutcome={'id':id,'text':outcome}}"><i class="fas fa-minus-circle"></i></a>
+                                                <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
+                                                    <a v-on:click="()=>{pendingMapOutcome = id;modals.mapOutcome=1}">Map module outcome</a>
+                                                </div>
+                                                <ul>
+                                                    <li v-for="(m, j) in programme.mapping[id]" v-if="programme.mapping[id][j].length > 0">
+                                                        {{ getModuleById(j).name }}
+                                                        <div class="outer">
+                                                            <div class="inner" v-for="o2 in programme.mapping[id][j]" v-bind:value="o2">
+                                                                {{ getModuleById(j).outcomes[o2] }} <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingUnmap={'module':getModuleById(j),'moduleOutcome': o2,'programmeOutcome': id, 'programmeOutcomeText': outcome};modals.unmapOutcome=1}"><i class="fas fa-minus-circle"></i></a>
+                                                            </div>
+                                                        </div>
                                                     </li>
-                                                </ol>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                </ol>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <br/>
+                                    </div>
+                                </div>
+                                <div v-else>
+                                    <p>No learning outcomes assigned</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2088,10 +2141,10 @@ const ProgrammeEditor = {
             v-on:submit="addOutcome($event)"
         />
         <confirm-remove-outcome
-            v-if="pendingDeleteOutcome"
+            v-if="pendingRemoveOutcome"
             v-bind:showing.sync="modals.removeOutcome"
-            v-bind:pending.sync="pendingDeleteOutcome"
-            v-on:submit="removeOutcome(pendingDeleteOutcome.id)"
+            v-bind:pending.sync="pendingRemoveOutcome"
+            v-on:submit="removeOutcome(pendingRemoveOutcome.id)"
         />
         <map-outcome
             v-if="pendingMapOutcome"
@@ -2195,7 +2248,29 @@ const ModuleEditor = {
                 confirmDeleteModule: 0,
                 editOutcome: 0,
                 setDescription: 0,
-            }
+            },
+            categories: [
+                {
+                    title: "Knowledge and understanding",
+                    context: "Having successfully completed this module, you will be able to demonstrate knowledge and understanding of:",
+                    code: "A"
+                },
+                {
+                    title: "Subject Specific Intellectual and Research Skills",
+                    context: "Having successfully completed this module you will be able to:",
+                    code: "B"
+                },
+                {
+                    title: "Transferable and Generic Skills",
+                    context: "Having successfully completed this module you will be able to:",
+                    code: "C"
+                },
+                {
+                    title: "Subject Specific Practical Skills",
+                    context: "Having successfully completed this module you will be able to:",
+                    code: "D"
+                }
+            ]
         }
     },
     computed: {
@@ -2218,6 +2293,18 @@ const ModuleEditor = {
         'set-description': SetDescription
     },
     methods: {
+        categoryOutcomes: function(code){
+            var out = null;
+            for(id in this.module.outcomes){
+                if(id[0] === code){
+                    if(out === null){
+                        out = {}
+                    }
+                    out[id] = this.module.outcomes[id]
+                }
+            }
+            return out;
+        },
         getModule: function(){
             return firebase.firestore().collection("modules").doc(this.$route.params.id).get()
             .then(snapshot => {
@@ -2297,7 +2384,8 @@ const ModuleEditor = {
             this.modals.addOutcome = 2;
             this.sendRequest("assignModuleOutcome", {
                 module: this.$route.params.id,
-                outcome: outcome
+                outcome: outcome.text,
+                category: outcome.category
             })
             .then(response => {
                 this.getModule()
@@ -2573,13 +2661,18 @@ const ModuleEditor = {
                             </h1>
                             <div class="content is-medium">
                                 <div v-if="Object.keys(module.outcomes).length > 0">
-                                    <ol>
-                                        <li v-for="(outcome, id) in module.outcomes" v-bind:value="id">
-                                            {{ outcome }} 
-                                            <a v-if="userIsLeader && editable" v-on:click="()=>{modals.editOutcome=1;pendingEditOutcome={'id':id,'text':outcome}}"><i class="fas fa-edit"></i></a>
-                                            <a v-if="userIsLeader && editable" v-on:click="()=>{modals.removeOutcome=1;pendingRemoveOutcome={'id':id,'text':outcome}}"><i class="fas fa-minus-circle"></i></a>
-                                        </li>
-                                    </ol>
+                                    <div v-for="category in categories" v-if="categoryOutcomes(category.code)">
+                                        <h2 class="title is-4">{{ category.title }}</h2>
+                                        <p>{{ category.context }}</p>
+                                        <div class="outer">
+                                            <div class="inner" v-for="(outcome, id) in categoryOutcomes(category.code)" :value="id">
+                                                {{ outcome }}
+                                                <a v-if="userIsLeader && editable" v-on:click="()=>{modals.editOutcome=1;pendingEditOutcome={'id':id,'text':outcome}}"><i class="fas fa-edit"></i></a>
+                                                <a v-if="userIsLeader && editable" v-on:click="()=>{modals.removeOutcome=1;pendingRemoveOutcome={'id':id,'text':outcome}}"><i class="fas fa-minus-circle"></i></a>
+                                            </div>
+                                        </div>
+                                        <br/>
+                                    </div>
                                 </div>
                                 <div v-else>
                                     <p>No learning outcomes assigned</p>

@@ -23,6 +23,19 @@
 			  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
         crossorigin="anonymous">
     </script>
+    <style>
+      .outer {
+        margin: 0 auto;
+      }
+
+      .inner {
+        margin-left: 25px;
+      }
+
+      .inner:before {
+        content: attr(value) ". ";
+      }
+    </style>
   </head>
   <body>
     <div id="app">

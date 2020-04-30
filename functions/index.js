@@ -750,6 +750,7 @@ exports.assignProgrammeOutcome = functions.https.onRequest((req, res) => {
         const idToken = req.body.idToken;
         const programme = req.body.programme;
         const outcome = req.body.outcome;
+        const category = req.body.category;
         var uid;
         var programmeDoc;
         var programmeRef;
@@ -812,10 +813,10 @@ exports.assignProgrammeOutcome = functions.https.onRequest((req, res) => {
         // ACT1 - Assign programme outcome
         .then(() => {
             var newId;
-            var maxId = Object.keys(programmeDoc.outcomes).length;
-            for(i=0;i<=maxId;i++){
-                if(!programmeDoc.outcomes.hasOwnProperty(i.toString())){
-                    newId = i.toString();
+            var maxId = Object.keys(programmeDoc.outcomes).filter(id => id[0] === category).length + 1;
+            for(i=1;i<=maxId;i++){
+                if(!programmeDoc.outcomes.hasOwnProperty(category + i.toString())){
+                    newId = category + i.toString();
                     break;
                 }
             }
@@ -839,6 +840,7 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
         const idToken = req.body.idToken;
         const module = req.body.module;
         const outcome = req.body.outcome;
+        const category = req.body.category;
         var uid;
         var moduleDoc;
         var moduleRef;
@@ -902,10 +904,10 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
         // ACT1 - Assign module outcome
         .then(() => {
             var newId;
-            var maxId = Object.keys(moduleDoc.outcomes).length;
-            for(i=0;i<=maxId;i++){
-                if(!moduleDoc.outcomes.hasOwnProperty(i.toString())){
-                    newId = i.toString();
+            var maxId = Object.keys(moduleDoc.outcomes).filter(id => id[0] === category).length + 1;
+            for(i=1;i<=maxId;i++){
+                if(!moduleDoc.outcomes.hasOwnProperty(category + i.toString())){
+                    newId = category + i.toString();
                     break;
                 }
             }
@@ -2811,5 +2813,30 @@ exports.getUserByEmail = functions.https.onRequest((req, res) => {
             res.status(400).send("User not found");
             return;
         })
+    });
+});
+exports.test = functions.https.onRequest((req, res) => {
+    res.send("NO");
+    return;
+    firestore.collection("programmes").doc("3zIso17U1yua6EwH7pwy").get()
+    .then(snapshot => {
+        var outcomes = snapshot.data().outcomes;
+        outcomes["A1"] = outcomes["0"]
+        delete outcomes["0"];
+        for(i=1;i<=8;i++){
+            outcomes["B"+i] = outcomes[i]
+            delete outcomes[i]
+        }
+        for(i=9;i<=16;i++){
+            outcomes["C"+(i-8)] = outcomes[i]
+            delete outcomes[i]
+        }
+        return outcomes;
+    })
+    .then(outcomes => {
+        return firestore.collection("programmes").doc("3zIso17U1yua6EwH7pwy").update("outcomes", outcomes)
+    })
+    .then(result => {
+        res.send(result)
     });
 });
