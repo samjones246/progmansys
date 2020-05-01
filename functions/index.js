@@ -1,3 +1,4 @@
+const parse = require('node-html-parser').parse
 // The Cloud Functions for Firebase SDK to create Cloud Functions and setup triggers.
 const functions = require('firebase-functions');
 const FieldValue = require('firebase-admin').firestore.FieldValue;
@@ -18,6 +19,8 @@ const firestore = admin.firestore();
 
 // Enable CORS
 const cors = require('cors')({origin: true});
+
+const axios = require('axios')
 
 exports.createProgramme = functions.https.onRequest(async (req, res) => {
     cors(req, res, () => {
@@ -894,11 +897,11 @@ exports.assignModuleOutcome = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             return Promise.resolve();
         })
         // ACT1 - Assign module outcome
@@ -1051,11 +1054,11 @@ exports.unassignModuleOutcome = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             programmes = snapshot;
             return Promise.resolve();
         })
@@ -1398,11 +1401,11 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module1).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             return Promise.resolve();
         })
         // GRD51 & GRD52 - Module 2 occurs before module 1
@@ -1498,11 +1501,11 @@ exports.unassignPrerequisite = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module1).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             return Promise.resolve();
         })
         // ACT41 - Assign Prerequisite
@@ -1619,11 +1622,11 @@ exports.changeSemester = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             return Promise.resolve();
         })
         // ACT1 - Change semester
@@ -1740,11 +1743,11 @@ exports.changeYear = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             return Promise.resolve();
         })
         // ACT1 - Change year
@@ -1823,11 +1826,11 @@ exports.changeCredits = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             return Promise.resolve();
         })
         // ACT1 - Change credits
@@ -2644,11 +2647,11 @@ exports.editModuleOutcome = functions.https.onRequest((req, res) => {
             return firestore.collection('programmes').where("modules", "array-contains", module).get();
         })
         .then(snapshot => {
-            snapshot.docs.forEach(element => {
+            for(element of snapshot.docs) {
                 if(element.published){
                     return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
                 }
-            })
+            }
             return Promise.resolve();
         })
         // ACT1 - Assign module outcome
@@ -2788,8 +2791,10 @@ exports.setModuleDescription = functions.https.onRequest((req, res) => {
 
 // Helper functions, will not affect system state
 exports.getUser = functions.https.onRequest((req, res) => {
+    console.log("a")
     cors(req, res, () => {
         const uid = req.body.uid;
+        console.log("a");
         admin.auth().getUser(uid)
         .then(userRecord => {
             res.send(userRecord.toJSON())
@@ -2815,28 +2820,157 @@ exports.getUserByEmail = functions.https.onRequest((req, res) => {
         })
     });
 });
-exports.test = functions.https.onRequest((req, res) => {
-    res.send("NO");
-    return;
-    firestore.collection("programmes").doc("3zIso17U1yua6EwH7pwy").get()
+/*
+exports.scrapeDescriptions = functions.https.onRequest((req, res) => {
+    var moduleCodes = []
+    var moduleIds = []
+    firestore.collection("modules").get()
     .then(snapshot => {
-        var outcomes = snapshot.data().outcomes;
-        outcomes["A1"] = outcomes["0"]
-        delete outcomes["0"];
-        for(i=1;i<=8;i++){
-            outcomes["B"+i] = outcomes[i]
-            delete outcomes[i]
+        var promises = []
+        for(doc of snapshot.docs){
+            var module = doc.data()
+            if(module.name.includes("COMP") || module.name.includes("ELEC")){
+                if(module.year === 3){
+                    moduleCodes.push(module.name.toLowerCase().slice(0, 8));
+                    moduleIds.push(doc.id)
+                }
+            }
         }
-        for(i=9;i<=16;i++){
-            outcomes["C"+(i-8)] = outcomes[i]
-            delete outcomes[i]
+        for(module of moduleCodes){
+            console.log(module)
+            promises.push(axios.get(`https://www.southampton.ac.uk/courses/modules/${module}.page`))
         }
-        return outcomes;
+        return Promise.all(promises);
     })
-    .then(outcomes => {
-        return firestore.collection("programmes").doc("3zIso17U1yua6EwH7pwy").update("outcomes", outcomes)
+    .then(responses => {
+        var batch = firestore.batch();
+        for(i=0;i<responses.length;i++){
+            var response = responses[i];
+            var root = parse(response.data);
+            var description = root.querySelector("h2").parentNode.childNodes[1].text;
+            var ref = firestore.collection("modules").doc(moduleIds[i]);
+            batch.update(ref, {"description": description});
+        }
+        return batch.commit()
+    })
+    .then(() => {
+        res.send("Done")
+    })
+    .catch(error => {
+        res.send(error.message)
+        return;
+    })
+})
+
+exports.scrapeOutcomes = functions.https.onRequest((req, res) => {
+    var moduleCodes = []
+    var moduleIds = []
+    firestore.collection("modules").get()
+    .then(snapshot => {
+        var promises = []
+        for(doc of snapshot.docs){
+            var module = doc.data()
+            if(module.name.includes("COMP") || module.name.includes("ELEC")){
+                if(module.year === 3){
+                    moduleCodes.push(module.name.toLowerCase().slice(0, 8));
+                    moduleIds.push(doc.id)
+                }
+            }
+        }
+        for(module of moduleCodes){
+            console.log(module)
+            promises.push(axios.get(`https://www.southampton.ac.uk/courses/modules/${module}.page`))
+        }
+        return Promise.all(promises);
+    })
+    .then(responses => {
+        var batch = firestore.batch();
+        for(i=0;i<responses.length;i++){
+            var response = responses[i];
+            var root = parse(response.data);
+            var parent = root.querySelector("h5").parentNode;
+            var outcomes = {}
+            for(j=0;j<parent.childNodes.length;j++){
+                node = parent.childNodes[j];
+                if(node.tagName === "h5"){
+                    var category;
+                    switch(node.text){
+                        case "Knowledge and Understanding":
+                            category = "A"
+                            break;
+                        case "Subject Specific Intellectual and Research Skills":
+                            category = "B"
+                            break;
+                        case "Transferable and Generic Skills":
+                            category = "C"
+                            break;
+                        case "Subject Specific Practical Skills":
+                            category = "D"
+                            break;
+                    }
+                    if(category){
+                        console.log(category)
+                        var target = parent.childNodes[j+2].childNodes
+                        for(k=0;k<target.length;k++){
+                            outcomes[category+(k+1)] = target[k].text
+                        }
+                    }
+                }
+            }
+            var ref = firestore.collection("modules").doc(moduleIds[i])
+            batch.update(ref, {"outcomes":outcomes})
+        }
+        return batch.commit()
+    })
+    .then(() => {
+        res.send("Done")
+    })
+    .catch(error => {
+        res.send(error.message)
+        return;
+    })
+})
+
+exports.test = functions.https.onRequest((req, res) => {
+    axios.get("https://www.southampton.ac.uk/courses/modules/elec3219.page")
+    .then(response => {
+        var root = parse(response.data);
+        var parent = root.querySelector("h5").parentNode;
+        var outcomes = {}
+        for(i=0;i<parent.childNodes.length;i++){
+            node = parent.childNodes[i];
+            if(node.tagName === "h5"){
+                var category;
+                switch(node.text){
+                    case "Knowledge and Understanding":
+                        category = "A"
+                        break;
+                    case "Subject Specific Intellectual and Research Skills":
+                        category = "B"
+                        break;
+                    case "Transferable and Generic Skills":
+                        category = "C"
+                        break;
+                    case "Subject Specific Practical Skills":
+                        category = "D"
+                        break;
+                }
+                if(category){
+                    console.log(category)
+                    var target = parent.childNodes[i+2].childNodes
+                    for(j=0;j<target.length;j++){
+                        outcomes[category+(j+1)] = target[j].text
+                    }
+                }
+            }
+        }
+        return firestore.collection("modules").doc("pHMXaNRPna5YIchdwHBj").update("outcomes", outcomes)
     })
     .then(result => {
-        res.send(result)
-    });
+        res.send("Done");
+    })
+    .catch(error => {
+        res.send(error.message)
+    })
 });
+*/

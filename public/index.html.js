@@ -9,7 +9,7 @@ var uiConfig = {
     privacyPolicyUrl: 'privacyPolicy.html'
 };
 var ui = new firebaseui.auth.AuthUI(firebase.auth());
-const apiRoot = "http://localhost:5001/progmansys-6f164/us-central1";
+const apiRoot = "https://us-central1-progmansys-6f164.cloudfunctions.net";
 
 const ProgrammeList = {
     data: function(){
@@ -397,7 +397,7 @@ const AddModule = {
                                 <li v-for="(semester, j) in year">
                                     <h1 class="title is-4">Semester {{ j+1 }}</h1>
                                     <ul>
-                                        <li v-for="(module, k) in semester.filter(m => searchString.length == 0 || m.name.includes(searchString))">
+                                        <li v-for="(module, k) in semester.filter(m => searchString.length == 0 || m.name.includes(searchString))" :key="module.id">
                                             <h1 class="title is-4">
                                                 {{ module.name }}
                                                 <span v-show="module.state == 2"><i class="fas fa-check"></i></span>
@@ -544,7 +544,7 @@ const EditOutcome = {
             <p class="modal-card-title">Edit Learning Outcome</p>
         </header>
         <section class="modal-card-body">
-            <input class="input" type="text" placeholder="Learning outcome" v-model="pending">
+            <textarea class="textarea" placeholder="Learning outcome" v-model="pending"></textarea>
         </section>
         <footer class="modal-card-foot">
             <button class="button is-success" v-on:click="$emit('submit', {'id': outcome.id, 'text':pending})" v-bind:disabled="pending.length==0 || showing==2" v-bind:class="{'is-loading':showing==2}">Submit</button>
@@ -574,7 +574,7 @@ const ConfirmRemoveOutcome = {
                 <p class="modal-card-title">Confirm decision</p>
             </header>
             <section class="modal-card-body">
-                <p class="content is-medium">Are you sure you wish to remove learning outcome <strong>\"{{ pending.text }}\"</strong> from this programme?</p>
+                <p class="content is-medium">Are you sure you wish to remove learning outcome <strong>\"{{ pending.id }}\"</strong>?</p>
             </section>
             <footer class="modal-card-foot">
                 <button class="button is-danger" v-on:click="$emit('submit')" v-bind:disabled="showing==2" v-bind:class="{'is-loading':showing==2}">Confirm</button>
@@ -624,7 +624,8 @@ const SetDescription = {
 const MapOutcome = {
     data: function(){
         return {
-            pendingM: null
+            pendingM: null,
+            searchString: ""
         }
     },
     props: {
@@ -636,11 +637,15 @@ const MapOutcome = {
     computed: {
         filteredModules: function () {
             var out = [];
-            for(i in this.modules){
-                var module = { ...this.modules[i]};
+            var modules = this.modules.filter(m => m.name.includes(this.searchString));
+            for(i in modules){
+                var module = { ...modules[i]};
                 var outcomes = {};
                 for(j in module.outcomes){
                     var add = true;
+                    if(j[0] !== this.pendingP[0]){
+                        add = false;
+                    }
                     if(this.mapping[this.pendingP]){
                         if(this.mapping[this.pendingP][module.id]){
                             if(this.mapping[this.pendingP][module.id].includes(j)){
@@ -660,6 +665,11 @@ const MapOutcome = {
             return out;
         }
     },
+    methods: {
+        submit(module, outcomeId){
+            this.$emit('submit', {'moduleId':module.id, 'outcomeId':i});
+        }
+    },
     watch: {
         showing: function(){
             if(this.showing==0){
@@ -675,19 +685,25 @@ const MapOutcome = {
                 <p class="modal-card-title">Map Learning Outcome</p>
             </header>
             <section class="modal-card-body">
+                <p class="control has-icons-left">
+                    <input class="input" type="text" placeholder="Search" v-model="searchString">
+                    <span class="icon is-left">
+                        <i class="fas fa-search"></i>
+                    </span>
+                </p>
                 <div class="content is-medium">
                     <ul>
                         <li v-for="module in filteredModules">
                             {{ module.name }}
-                            <ol>
-                                <li v-for="(outcome, i) in module.outcomes" v-bind:value="i">
+                            <div class="outer">
+                                <div class="inner" v-for="(outcome, i) in module.outcomes" v-bind:value="i">
                                     {{ outcome }} 
                                     <a v-on:click="()=>{$emit('submit', {'moduleId':module.id, 'outcomeId':i});pendingM=module.name+':'+i}" v-if="showing==1">
                                         <i class="fas fa-plus-circle"></i>
                                     </a>
                                     <i v-if="showing==2 && pendingM==module.name+':'+i" class="fas fa-circle-notch fa-spin"></i> 
-                                </li>
-                            </ol>
+                                </div>
+                            </div>
                         </li>
                     </ul>
                 </div>
@@ -2009,7 +2025,7 @@ const ProgrammeEditor = {
                     <div class="content is-medium">
                         <p>
                             <span v-if="programme.description.length === 0">No description set</span>
-                            <span v-else>{{ programme.description }}</span>
+                            <span v-else style="white-space: pre-wrap">{{ programme.description }}</span>
                             <a v-if="userIsAdmin && !programme.published" v-on:click="modals.setDescription=1"><i class="fas fa-edit"></i></a>
                         </p>
                     </div>
@@ -2032,7 +2048,7 @@ const ProgrammeEditor = {
                                             <li v-for="s in [1,2]">
                                                 <h3 class="title is-4">Semester {{ s }} </h3>
                                                 <ul v-if="core[y-1][s-1].length > 0 || optional[y-1][s-1].length > 0">
-                                                    <li v-for="type in ['Core', 'Optional']" v-if="(type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]).length > 0">
+                                                    <li v-for="type in ['Core', 'Optional']" v-if="(type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]).length > 0" :key="type">
                                                         <h3 class="title is-4">{{ type }}</h3>
                                                         <ul>    
                                                             <li v-for="m in type==='Core' ? core[y-1][s-1] : optional[y-1][s-1]" :key="m.id">
@@ -2073,7 +2089,7 @@ const ProgrammeEditor = {
                                         <p>{{ category.context }}</p>
                                         <div class="outer">
                                             <div class="inner" v-for="(outcome, id) in categoryOutcomes(category.code)" :value="id">
-                                                {{ outcome }}
+                                                <span style="white-space: pre-wrap">{{ outcome }}</span>
                                                 <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{modals.editOutcome=1;pendingEditOutcome={'id':id,'text':outcome}}"><i class="fas fa-edit"></i></a>
                                                 <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{modals.removeOutcome=1;pendingRemoveOutcome={'id':id,'text':outcome}}"><i class="fas fa-minus-circle"></i></a>
                                                 <div class="subtitle is-6" v-if="userIsAdmin && !programme.published">
@@ -2084,7 +2100,8 @@ const ProgrammeEditor = {
                                                         {{ getModuleById(j).name }}
                                                         <div class="outer">
                                                             <div class="inner" v-for="o2 in programme.mapping[id][j]" v-bind:value="o2">
-                                                                {{ getModuleById(j).outcomes[o2] }} <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingUnmap={'module':getModuleById(j),'moduleOutcome': o2,'programmeOutcome': id, 'programmeOutcomeText': outcome};modals.unmapOutcome=1}"><i class="fas fa-minus-circle"></i></a>
+                                                                <span style="white-space: pre-wrap">{{ getModuleById(j).outcomes[o2] }} </span> 
+                                                                <a v-if="userIsAdmin && !programme.published" v-on:click="()=>{pendingUnmap={'module':getModuleById(j),'moduleOutcome': o2,'programmeOutcome': id, 'programmeOutcomeText': outcome};modals.unmapOutcome=1}"><i class="fas fa-minus-circle"></i></a>
                                                             </div>
                                                         </div>
                                                     </li>
@@ -2628,7 +2645,7 @@ const ModuleEditor = {
                                 <p class="title is-5">
                                     Year: {{ module.year }} <a v-if="userIsLeader" v-on:click="modals.changeYear=1"><i class="fas fa-edit"></i></a><br><br>
                                     Semester: {{ module.semester }} <a v-if="userIsLeader" v-on:click="modals.changeSemester=1"><i class="fas fa-edit"></i></a><br><br>
-                                    Credits: {{ module.credits }} <a v-if="userIsLeader" v-on:click="modals.changeCredits=1"><i class="fas fa-edit"></i></a>
+                                    Credits (ECTS): {{ module.credits }} <a v-if="userIsLeader" v-on:click="modals.changeCredits=1"><i class="fas fa-edit"></i></a>
                                 </p>
                             </div>
                         </div>
@@ -2636,7 +2653,7 @@ const ModuleEditor = {
                     <div class="content is-medium">
                         <p>
                             <span v-if="module.description.length">
-                                {{ module.description }}
+                                <span style="white-space: pre-wrap">{{ module.description }}</span>
                             </span>
                             <span v-else>
                                 No Description Set
@@ -2666,7 +2683,7 @@ const ModuleEditor = {
                                         <p>{{ category.context }}</p>
                                         <div class="outer">
                                             <div class="inner" v-for="(outcome, id) in categoryOutcomes(category.code)" :value="id">
-                                                {{ outcome }}
+                                                <span style="white-space: pre-wrap">{{ outcome }}</span>
                                                 <a v-if="userIsLeader && editable" v-on:click="()=>{modals.editOutcome=1;pendingEditOutcome={'id':id,'text':outcome}}"><i class="fas fa-edit"></i></a>
                                                 <a v-if="userIsLeader && editable" v-on:click="()=>{modals.removeOutcome=1;pendingRemoveOutcome={'id':id,'text':outcome}}"><i class="fas fa-minus-circle"></i></a>
                                             </div>
@@ -2851,7 +2868,7 @@ const CreateModule = {
               </div>
             </div>
             <div class="field">
-              <label class="label">Credits: </label>
+              <label class="label">Credits (ECTS): </label>
               <div class="control">
                 <div class="select">
                   <select v-model="formData.credits">
@@ -3046,6 +3063,7 @@ var app = new Vue({
     created: function(){
         firebase.auth().onAuthStateChanged(user => {
             this.user = user;
+            user.getIdToken().then(idToken => console.log(idToken))
         })
     }
 });
