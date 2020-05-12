@@ -640,7 +640,7 @@ const MapOutcome = {
             var modules = this.modules.filter(m => m.name.includes(this.searchString));
             for(i in modules){
                 var module = { ...modules[i]};
-                var outcomes = {};
+                var outcomes = [];
                 for(j in module.outcomes){
                     var add = true;
                     if(j[0] !== this.pendingP[0]){
@@ -654,20 +654,36 @@ const MapOutcome = {
                         }
                     }
                     if(add){
-                        outcomes[j] = module.outcomes[j];
+                        outcomes.push({
+                            id:j,
+                            text:module.outcomes[j],
+                            state: 0
+                        });
                     }
                 }
-                if(Object.keys(outcomes).length){
+                if(outcomes.length){
                     module.outcomes = outcomes;
                     out.push(module);
+                }
+            }
+            return out;
+        },
+        pending: function(){
+            var out = [];
+            for(module of this.filteredModules){
+                for(outcome of module.outcomes){
+                    if(outcome.state===1){
+                        out.push(outcome);
+                    }
                 }
             }
             return out;
         }
     },
     methods: {
-        submit(module, outcomeId){
-            this.$emit('submit', {'moduleId':module.id, 'outcomeId':i});
+        submit(moduleId, outcome){
+            outcome.state = 1;
+            this.$emit('submit', {'moduleId':moduleId, 'outcome':outcome});
         }
     },
     watch: {
@@ -693,15 +709,16 @@ const MapOutcome = {
                 </p>
                 <div class="content is-medium">
                     <ul>
-                        <li v-for="module in filteredModules">
+                        <li v-for="module in filteredModules" :key="module.id">
                             {{ module.name }}
                             <div class="outer">
-                                <div class="inner" v-for="(outcome, i) in module.outcomes" v-bind:value="i">
-                                    {{ outcome }} 
-                                    <a v-on:click="()=>{$emit('submit', {'moduleId':module.id, 'outcomeId':i});pendingM=module.name+':'+i}" v-if="showing==1">
+                                <div class="inner" v-for="outcome in module.outcomes" v-bind:value="outcome.id" :key="outcome.id">
+                                    {{ outcome.text }} 
+                                    <a v-on:click="submit(module.id, outcome)" v-if="outcome.state===0">
                                         <i class="fas fa-plus-circle"></i>
                                     </a>
-                                    <i v-if="showing==2 && pendingM==module.name+':'+i" class="fas fa-circle-notch fa-spin"></i> 
+                                    <i v-if="outcome.state===1" class="fas fa-circle-notch fa-spin"></i>
+                                    <i v-if="outcome.state===2" class="fas fa-check"></i> 
                                 </div>
                             </div>
                         </li>
@@ -1760,13 +1777,13 @@ const ProgrammeEditor = {
                 programme: this.$route.params.id,
                 programmeOutcome: p_out,
                 module: moduleId,
-                moduleOutcome: m_out
+                moduleOutcome: m_out.id
             })
             .then(response => {
                 this.getProgramme()
                 .then(() => {
-                    this.pendingMapOutcome = null;
-                    this.modals.mapOutcome = 0;
+                    this.modals.mapOutcome = 1;
+                    m_out.state = 2;
                 })
             })
             .catch(error => {
@@ -2013,10 +2030,10 @@ const ProgrammeEditor = {
                                 </h2>
                                 <h2 class="title is-5">
                                     <div v-if="programme.published">
-                                        Published (<a v-if="userIsLeader" v-on:click="modals.confirmUnpublishProgramme = 1">Unpublish</a>)
+                                        Published <span v-if="userIsLeader">(<a v-on:click="modals.confirmUnpublishProgramme = 1">Unpublish</a>)</span>
                                     </div>
                                     <div v-else>
-                                        Unpublished (<a v-if="userIsLeader" v-on:click="modals.confirmPublishProgramme = 1">Publish</a>)
+                                        Unpublished <span v-if="userIsLeader">(<a v-if="userIsLeader" v-on:click="modals.confirmPublishProgramme = 1">Publish</a>)</span>
                                     </div>
                                 </h2>
                             </div>
@@ -2169,7 +2186,7 @@ const ProgrammeEditor = {
             v-bind:pendingP.sync="pendingMapOutcome"
             v-bind:modules="modules"
             v-bind:mapping="programme.mapping"
-            v-on:submit="mapOutcome(pendingMapOutcome, $event.outcomeId, $event.moduleId)"
+            v-on:submit="mapOutcome(pendingMapOutcome, $event.outcome, $event.moduleId)"
         />
         <confirm-unmap-outcome
             v-if="pendingUnmap"
@@ -3063,7 +3080,6 @@ var app = new Vue({
     created: function(){
         firebase.auth().onAuthStateChanged(user => {
             this.user = user;
-            user.getIdToken().then(idToken => console.log(idToken))
         })
     }
 });

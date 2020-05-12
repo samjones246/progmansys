@@ -29,18 +29,21 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
         var duration = req.body.duration;
         var idToken = req.body.idToken;
         var uid = null;
-
-        // Check duration is valid
-        if(![1,2,3,4].includes(duration)){
-            res.status(400).send("Duration must be a number between 1 and 4");
-            return;
-        }
-        // Check user token
+        // GRD1 - Requesting user is logged in
         admin.auth().verifyIdToken(idToken)
         .then(decodedToken => {
             uid = decodedToken.uid;
             return null;
         })
+        // GRD2 - Duration is valid
+        .then(() => {
+            if(![1,2,3,4].includes(duration)){
+                return Promise.reject(Error("Duration must be a number between 1 and 4"));
+            }else{
+                return Promise.resolve();
+            }
+        })
+        // GRD3 - Programme name is not taken
         .then(() => {
             return firestore.collection('programmes').where('name', '==', name).get();
         })
@@ -51,6 +54,7 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
                 return Promise.reject(Error("A programme with this name already exists"));
             }
         })
+        // ACT1 - Create Programme
         .then(() => {
             return firestore.collection("programmes").add({
                 name: name,
@@ -66,14 +70,18 @@ exports.createProgramme = functions.https.onRequest(async (req, res) => {
                 published: false,
                 description: ""
             });
-        }).then(documentRef => {
+        })
+        .then(documentRef => {
             return documentRef.get();
-        }).then(snapshot => {
+        })
+        .then(snapshot => {
             var data = snapshot.data();
             data.id = snapshot.id;
             res.send(data);
             return;
-        }).catch(error => {
+        })
+        // If a guard failed, respond with the error
+        .catch(error => {
             res.status(400).send(error.message)
             return;
         });
@@ -89,15 +97,21 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
         const credits = req.body.credits;
         const idToken = req.body.idToken;
         var uid;
-        // Check semester is valid
-        new Promise((resolve, reject) => {
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+            return;
+        })
+        // GRD2 - Semester is valid
+        .then(() => {
             if(![1, 2].includes(semester)){
-                reject(Error("Semester must be a number between 1 and 2"));
+                return Promise.reject(Error("Semester must be a number between 1 and 2"));
             }else{
-                resolve();
+                return Promise.resolve();
             }
         })
-        // Check year is valid
+        // GRD3 - Year is valid
         .then(() => {
             if(![1,2,3,4].includes(year)){
                 return Promise.reject(Error("Year must be a number between 1 and 4"));
@@ -105,15 +119,7 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
                 return Promise.resolve();
             }
         })
-        // Check user is logged in
-        .then(() => {
-            return admin.auth().verifyIdToken(idToken);
-        })
-        .then(decodedToken => {
-            uid = decodedToken.uid;
-            return;
-        })
-        // Check module name is not taken
+        // GRD4 - Module name is not taken
         .then(() => {
             return firestore.collection('modules').where('name', '==', name).get();
         })
@@ -124,7 +130,7 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
                 return Promise.reject(Error("A module with this name already exists"))
             }
         })
-        // Create module
+        // ACT1 - Create module
         .then(() => {
             return firestore.collection('modules').add({
                 name: name,
@@ -146,6 +152,7 @@ exports.createModule = functions.https.onRequest(async (req,res) => {
             res.send(data);
             return;
         })
+        // If a guard failed, respond with the error
         .catch(error => {
             res.status(400).send(error.message);
             return;
@@ -162,8 +169,15 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
         var uid;
         var programmeDoc;
         var moduleDoc;
-        // Check module exists
-        firestore.collection('modules').doc(module).get()
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+        })
+         // GRD2 - Module exists
+        .then(() => {
+           return firestore.collection('modules').doc(module).get()
+        })
         .then(snapshot => {
             if(!snapshot.exists){
                 return Promise.reject(Error("Module not found"));
@@ -172,7 +186,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
                 return Promise.resolve();
             }
         })
-        // Check programme exists
+        // GRD3 - Programme exists
         .then(() => {
             return firestore.collection('programmes').doc(programme).get();
         })
@@ -184,19 +198,15 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
                 return Promise.resolve();
             }
         })
-        // Check user is authorised
+        // GRD4 - Requesting user is programme administrator
         .then(() => {
-            return admin.auth().verifyIdToken(idToken);
-        })
-        .then(decodedToken => {
-            uid = decodedToken.uid;
             if(!programmeDoc.administrators.includes(uid)){
-                return Promise.reject(Error("User not permitted to perform this action"));
+                return Promise.reject(Error("User is not permitted to perform this action"));
             }else{
                 return Promise.resolve();
             }
         })
-        // Check this module is not already assigned to this programme
+        // GRD5 - Module is not already assigned to this programme
         .then(() => {
             if(programmeDoc.modules.includes(module)){
                 return Promise.reject(Error("Module already assigned to this programme"));
@@ -204,7 +214,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
                 return Promise.resolve();
             }
         })
-        // Check programme is not published
+        // GRD6 - Programme is not published
         .then(() => {
             if(programmeDoc.published){
                 return Promise.reject(Error("Cannot edit a published programme"));
@@ -212,7 +222,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
                 return Promise.resolve();
             }
         })
-        // Check module year is within programme duration
+        // GRD7 - Module year is within programme duration
         .then(() => {
             if(moduleDoc.year > programmeDoc.duration){
                 return Promise.reject(Error("Module year not within programme duration"));
@@ -220,7 +230,7 @@ exports.assignModule = functions.https.onRequest(async (req,res) => {
                 return Promise.resolve();
             }
         })
-        // Assign module
+        // ACT1 - Assign module
         .then(() => {
             programmeDoc.modules.push(module);
             return firestore.collection('programmes').doc(programme).update({
@@ -247,8 +257,15 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
         var uid;
         var moduleRef;
         var moduleDoc;
-        // Check module exists
-        firestore.collection('modules').doc(module).get()
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+        })
+        // GRD2 - Module exists
+        .then(() => {
+            return firestore.collection('modules').doc(module).get()
+        })
         .then(snapshot => {
             if(!snapshot.exists){
                 return Promise.reject(Error("Module not found"));
@@ -258,20 +275,15 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
                 return Promise.resolve();
             }
         })
-        // Check user is logged in
+        // GRD3 - Requesting user is module leader
         .then(() => {
-            return admin.auth().verifyIdToken(idToken);
-        })
-        // Check user is module leader
-        .then(decodedToken => {
-            uid = decodedToken.uid;
             if(!moduleDoc.leader === uid){
-                return Promise.reject(Error("User not permitted to perform this action"));
+                return Promise.reject(Error("Only the module leader can perform this action"));
             }else{
                 return Promise.resolve();
             }
         })
-        // Check module is not part of any programmes
+        // GRD4 - Module is not assigned to any programme
         .then(() => {
             return firestore.collection("programmes").where("modules", "array-contains", module).get();
         })
@@ -282,7 +294,7 @@ exports.deleteModule = functions.https.onRequest((req, res) => {
                 return Promise.reject(Error("Cannot delete module while it is a member of a programme"));
             }
         })
-        // Delete module
+        // ACT1 - Delete module
         .then(() => {
             return moduleRef.delete();
         })
@@ -304,31 +316,33 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
         var uid;
         var programmeRef;
         var programmeDoc;
-        // Check programme exists
-        firestore.collection('programmes').doc(programme).get()
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid;
+        })
+        // GRD2 - Programme exists
+        .then(() => {
+            return firestore.collection('programmes').doc(programme).get()
+        })
         .then(snapshot => {
             if(!snapshot.exists){
-                return Promise.reject(Error("programme not found"));
+                return Promise.reject(Error("Programme not found"));
             }else{
                 programmeRef = snapshot.ref;
                 programmeDoc = snapshot.data();
                 return Promise.resolve();
             }
         })
-        // Check user is logged in
+        // GRD3 - Requesting user is programme leader
         .then(() => {
-            return admin.auth().verifyIdToken(idToken);
-        })
-        // Check user is programme leader
-        .then(decodedToken => {
-            uid = decodedToken.uid;
             if(!programmeDoc.leader === uid){
-                return Promise.reject(Error("User not permitted to perform this action"));
+                return Promise.reject(Error("Only the programme leader can perform this action"));
             }else{
                 return Promise.resolve();
             }
         })
-        // Check programme is not published
+        // GRD4 - Programme is not published
         .then(() => {
             if(programmeDoc.published){
                 return Promise.reject(Error("Cannot delete a published programme"));
@@ -336,7 +350,7 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
                 return Promise.resolve();
             }
         })
-        // Delete programme
+        // ACT1 - Delete programme
         .then(() => {
             return programmeRef.delete();
         })
@@ -344,6 +358,7 @@ exports.deleteProgramme = functions.https.onRequest((req, res) => {
             res.send("Programme deleted");
             return;
         })
+        // If a guard failed, respond with the error
         .catch(error => {
             res.status("400").send(error.message);
         });
@@ -359,8 +374,15 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
         var uid;
         var programmeDoc;
         var moduleDoc;
-        // Check module exists
-        firestore.collection('modules').doc(module).get()
+        // GRD1 - Requesting user is logged in
+        admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            uid = decodedToken.uid; 
+        })
+        // GRD2 - Module exists
+        .then(() => {
+            return firestore.collection('modules').doc(module).get()
+        })
         .then(snapshot => {
             if(!snapshot.exists){
                 return Promise.reject(Error("Module not found"));
@@ -369,7 +391,7 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
                 return Promise.resolve();
             }
         })
-        // Check programme exists
+        // GRD3 - Programme exists
         .then(() => {
             return firestore.collection('programmes').doc(programme).get();
         })
@@ -381,19 +403,15 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
                 return Promise.resolve();
             }
         })
-        // Check requesting user is an administrator
+        // GRD4 - Requesting user is a programme administrator
         .then(() => {
-            return admin.auth().verifyIdToken(idToken);
-        })
-        .then(decodedToken => {
-            uid = decodedToken.uid; 
             if(!programmeDoc.administrators.includes(uid)){
                 return Promise.reject(Error("User not permitted to perform this action"));
             }else{
                 return Promise.resolve();
             }
         })
-        // Check this module is assigned to this programme
+        // GRD5 - Module is assigned to programme
         .then(() => {
             if(!programmeDoc.modules.includes(module)){
                 return Promise.reject(Error("Module not assigned to this programme"));
@@ -401,7 +419,7 @@ exports.unassignModule = functions.https.onRequest((req, res) => {
                 return Promise.resolve();
             }
         })
-        // Check programme is not published
+        // GRD6 - Programme is not published
         .then(() => {
             if(programmeDoc.published){
                 return Promise.reject(Error("Cannot edit a published programme"));
@@ -730,6 +748,17 @@ exports.transferModuleOwnership = functions.https.onRequest((req, res) => {
             }
         })
         // GRD6 - Module is not a member of any published programme
+        .then(() => {
+            return firestore.collection('programmes').where("modules", "array-contains", module).get();
+        })
+        .then(snapshot => {
+            for(element of snapshot.docs) {
+                if(element.published){
+                    return Promise.reject(Error("Cannot edit a module which is part of a published programme"));
+                }
+            }
+            return Promise.resolve();
+        })
         // ACT1 - Transfer module ownership
         .then(() => {
             return moduleRef.update({
@@ -1396,7 +1425,7 @@ exports.assignPrerequisite = functions.https.onRequest((req, res) => {
                 return Promise.resolve();
             }
         })
-        // GRD49 - Module1 is not a member of any published programme
+        // GRD49 - Module 1 is not a member of any published programme
         .then(() => {
             return firestore.collection('programmes').where("modules", "array-contains", module1).get();
         })
@@ -1988,7 +2017,7 @@ exports.publishProgramme = functions.https.onRequest((req, res) => {
             if(programmeDoc.leader === uid){
                 return Promise.resolve();
             }else{
-                return Promise.reject(Error("Only a programme administrator can perform this action"));
+                return Promise.reject(Error("Only the programme leader can perform this action"));
             }
         })
         // GRD4 - Programme is not already published
